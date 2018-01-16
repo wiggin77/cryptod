@@ -20,6 +20,7 @@ const (
 )
 
 // header for encrypted files
+// (allows for versioning and changing the encryption scheme later)
 type header struct {
 	size   [1]byte // size in bytes of the other fields
 	magic  [magicSize]byte
@@ -85,5 +86,5 @@ func (h *header) read(r io.Reader) error {
 			return err
 		}
 	}
-	return nil
+	return h.validate()
 }

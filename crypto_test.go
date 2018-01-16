@@ -2,31 +2,46 @@ package crypto
 
 import (
 	"bytes"
-	"io"
 	"testing"
 )
 
-func TestEncrypt(t *testing.T) {
-	r := generatePlain(1000 * 1024 * 100)
-	w := &bytes.Buffer{}
+func TestEncryptDecrypt(t *testing.T) {
+	sizes := []int{1, 10, 100, 1000, 1000 * 1024 * 100}
+	const key = "secret key"
 
-	if err := Encrypt(r, w, "secret_key"); err != nil {
-		t.Error("encrypt error: ", err)
-		return
+	// encrypt then decrypt anf check results
+	for _, size := range sizes {
+		plaintext := generatePlainText(size)
+
+		r := bytes.NewReader(plaintext)
+		buf := &bytes.Buffer{}
+
+		if err := Encrypt(r, buf, key); err != nil {
+			t.Errorf("encrypt error for size %d: %v", size, err)
+			break
+		}
+
+		pbuf := &bytes.Buffer{}
+		if err := Decrypt(buf, pbuf, key); err != nil {
+			t.Errorf("decrypt error for size %d: %v", size, err)
+			break
+		}
+
+		if bytes.Compare(plaintext, pbuf.Bytes()) != 0 {
+			t.Errorf("compare failed for size %d, bytes differ", size)
+			break
+		}
 	}
-
-	t.Logf("cipher len: %d/n", w.Len())
 }
 
-func generatePlain(size int) io.Reader {
-	section := []byte("0123456789")
-	count := (size / len(section)) + 1
-	buf := make([]byte, len(section)*count)
+// helper to generate predicable plaintext of any size
+func generatePlainText(size int) []byte {
+	const s = "0123456789"
+	src := []byte(s)
+	section := make([]byte, size)
 
-	idx := 0
-	for i := 0; i < count; i++ {
-		copy(buf[idx:], section)
-		idx += len(section)
+	for i := range section {
+		section[i] = src[i%len(s)]
 	}
-	return bytes.NewReader(buf)
+	return section
 }

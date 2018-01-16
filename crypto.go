@@ -32,7 +32,7 @@ func Encrypt(r io.Reader, w io.Writer, skey string) error {
 	var bHeaderWritten bool
 
 	for {
-		n, err := r.Read(pbuf)
+		n, readErr := r.Read(pbuf)
 		if n > 0 {
 			p := pbuf[:n]
 			// randomize the nonce
@@ -52,7 +52,7 @@ func Encrypt(r io.Reader, w io.Writer, skey string) error {
 					}
 				}
 				// write a chunk tag containing actual encrypted block size
-				if err := writeChunkTag(clen, nonce, w); err != nil {
+				if err := writeChunkHeader(chunkHeader{nonce: nonce, size: clen}, w); err != nil {
 					return err
 				}
 				// write encrypted data to output steam
@@ -62,7 +62,7 @@ func Encrypt(r io.Reader, w io.Writer, skey string) error {
 			}
 		}
 
-		if err == io.EOF {
+		if readErr == io.EOF {
 			break
 		}
 	}
@@ -72,13 +72,61 @@ func Encrypt(r io.Reader, w io.Writer, skey string) error {
 // Decrypt reads from `r` until EOF and writes the decrypted contents to `w`
 // based using the specified key.
 func Decrypt(r io.Reader, w io.Writer, skey string) error {
-	/*
-		gcm, err := getGCM(skey)
+	gcm, err := getGCM(skey)
+	if err != nil {
+		return err
+	}
+
+	maxChunkSize := chunkSize + gcm.Overhead()
+	maxChunkSizeSanity := maxChunkSize * 2
+
+	// reuse buffers to reduce GC
+	buf := make([]byte, maxChunkSize)
+
+	// read and validate the header
+	h := header{}
+	if err := h.read(r); err != nil {
+		return err
+	}
+
+	for {
+		// read next chunk header
+		var ch chunkHeader
+		ch, err = readChunkHeader(r, maxChunkSizeSanity)
+		if err == io.EOF {
+			break
+		}
 		if err != nil {
 			return err
 		}
-	*/
-	return fmt.Errorf("not implemented")
+		// ensure cbuf is big enough
+		if cap(buf) < int(ch.size) {
+			buf = make([]byte, ch.size)
+		}
+		// read the encrypted chunk
+		cbuf := buf[:ch.size]
+		n, readErr := r.Read(cbuf)
+		if readErr != nil && readErr != io.EOF {
+			return readErr
+		}
+		if n != int(ch.size) {
+			return fmt.Errorf("wrong chunk size read, expected %d, got %d", ch.size, n)
+		}
+		// decrypt the chunk
+		var pbuf []byte
+		if pbuf, err = gcm.Open(cbuf[:0], ch.nonce, cbuf, nil); err != nil {
+			return err
+		}
+		// write plaintext to w
+		if _, err := w.Write(pbuf); err != nil {
+			return err
+		}
+
+		if readErr == io.EOF {
+			break
+		}
+	}
+	return nil
 }
 
 // getGCM returns a AES256 block cipher wrapped in GCM.
@@ -105,13 +153,4 @@ func writeHeader(w io.Writer) (bool, error) {
 		return false, err
 	}
 	return true, nil
-}
-
-// writes a chunk header, containing the tag id, nonce and chunk size
-func writeChunkTag(clen uint32, nonce []byte, w io.Writer) error {
-	h := chunkHeader{}
-	h.nonce = nonce
-	h.size = clen
-
-	return writeChunkHeader(h, w)
 }

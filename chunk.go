@@ -56,7 +56,9 @@ func readChunkHeader(r io.Reader, maxChunkSize int) (chunkHeader, error) {
 	// read the tag (open)
 	taglen := len(chunkTag)
 	tag := make([]byte, taglen)
-	r.Read(tag)
+	if _, err := r.Read(tag); err != nil {
+		return h, err
+	}
 	if bytes.Compare(tag, []byte(chunkTag)) != 0 {
 		return h, errors.New("invalid chunk header tag (open)")
 	}
@@ -97,7 +99,9 @@ func readChunkHeader(r io.Reader, maxChunkSize int) (chunkHeader, error) {
 
 	// read the tag (close)
 	tag = make([]byte, taglen)
-	r.Read(tag)
+	if _, err := r.Read(tag); err != nil {
+		return h, err
+	}
 	if bytes.Compare(tag, []byte(chunkTag)) != 0 {
 		return h, errors.New("invalid chunk header tag (close)")
 	}
