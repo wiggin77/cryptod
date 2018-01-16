@@ -1,23 +1,21 @@
-package crypto_test
+package crypto
 
 import (
 	"bytes"
 	"io"
 	"testing"
-
-	"github.com/wiggin77/shadowcrypt/crypto"
 )
 
 func TestEncrypt(t *testing.T) {
-	r := generatePlain(100)
+	r := generatePlain(1000 * 1024 * 100)
 	w := &bytes.Buffer{}
 
-	if err := crypto.Encrypt(r, w, "secret_key"); err != nil {
+	if err := Encrypt(r, w, "secret_key"); err != nil {
 		t.Error("encrypt error: ", err)
 		return
 	}
 
-	t.Log("cipher len: ", w.Len(), "\n")
+	t.Logf("cipher len: %d/n", w.Len())
 }
 
 func generatePlain(size int) io.Reader {
