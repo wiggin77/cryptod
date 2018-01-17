@@ -29,7 +29,11 @@ func Encrypt(r io.Reader, w io.Writer, skey string) error {
 	nonce := make([]byte, gcm.NonceSize())
 	cbuf := make([]byte, len(pbuf)+gcm.Overhead())
 	var ctr uint32 = 1
-	var bHeaderWritten bool
+
+	// write the stream header
+	if err = writeHeader(w); err != nil {
+		return err
+	}
 
 	for {
 		n, readErr := r.Read(pbuf)
@@ -45,12 +49,6 @@ func Encrypt(r io.Reader, w io.Writer, skey string) error {
 			c := gcm.Seal(cbuf[:0], nonce, p, nil)
 			var clen = uint32(len(c))
 			if clen > 0 {
-				// write file header once but only if there will be more data
-				if !bHeaderWritten {
-					if bHeaderWritten, err = writeHeader(w); err != nil {
-						return err
-					}
-				}
 				// write a chunk tag containing actual encrypted block size
 				if err := writeChunkHeader(chunkHeader{nonce: nonce, size: clen}, w); err != nil {
 					return err
@@ -144,11 +142,8 @@ func getGCM(skey string) (cipher.AEAD, error) {
 }
 
 // writes a file header
-func writeHeader(w io.Writer) (bool, error) {
+func writeHeader(w io.Writer) error {
 	h := header{}
 	h.init()
-	if err := h.write(w); err != nil {
-		return false, err
-	}
-	return true, nil
+	return h.write(w)
 }

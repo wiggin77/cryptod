@@ -7,10 +7,10 @@ import (
 )
 
 func TestEncryptDecrypt(t *testing.T) {
-	sizes := []int{1, 10, 100, 1000, 1000 * 1024 * 100}
+	sizes := []int{0, 1, 10, 100, 1000, 1000 * 1024 * 100}
 	const key = "secret key"
 
-	// encrypt then decrypt anf check results
+	// encrypt then decrypt and check results
 	for _, size := range sizes {
 		plaintext := generatePlainText(size)
 
