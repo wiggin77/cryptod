@@ -66,7 +66,9 @@ func Encrypt(r io.Reader, w io.Writer, skey string) error {
 			break
 		}
 	}
-	return nil
+	// write the tomb chunk header
+	io.ReadFull(rand.Reader, nonce)
+	return writeChunkHeader(chunkHeader{nonce: nonce, size: 0, tomb: true}, w)
 }
 
 // Decrypt reads from `r` until EOF and writes the decrypted contents to `w`
@@ -93,11 +95,11 @@ func Decrypt(r io.Reader, w io.Writer, skey string) error {
 		// read next chunk header
 		var ch chunkHeader
 		ch, err = readChunkHeader(r, maxChunkSizeSanity)
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
+		if err != nil && !ch.tomb {
 			return err
+		}
+		if ch.tomb {
+			break // tomb chunk header means we're done
 		}
 		// ensure cbuf is big enough
 		if cap(buf) < int(ch.size) {
@@ -120,10 +122,6 @@ func Decrypt(r io.Reader, w io.Writer, skey string) error {
 		// write plaintext to w
 		if _, err := w.Write(pbuf); err != nil {
 			return err
-		}
-
-		if readErr == io.EOF {
-			break
 		}
 	}
 	return nil

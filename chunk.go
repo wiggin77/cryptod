@@ -9,12 +9,15 @@ import (
 )
 
 const (
-	chunkTag = "ct"
+	chunkTag      = "ct"
+	chunkTypeData = "d"
+	chunkTypeTomb = "t"
 )
 
 type chunkHeader struct {
 	nonce []byte
 	size  uint32
+	tomb  bool
 }
 
 // writes a chunk header, containing the tag id, nonce and chunk size
@@ -22,6 +25,17 @@ func writeChunkHeader(ch chunkHeader, w io.Writer) error {
 	// write the tag (open)
 	tag := []byte(chunkTag)
 	if _, err := w.Write(tag); err != nil {
+		return err
+	}
+
+	// write the chunk type
+	var t []byte
+	if ch.tomb {
+		t = []byte(chunkTypeTomb)
+	} else {
+		t = []byte(chunkTypeData)
+	}
+	if _, err := w.Write(t); err != nil {
 		return err
 	}
 
@@ -61,6 +75,15 @@ func readChunkHeader(r io.Reader, maxChunkSize int) (chunkHeader, error) {
 	}
 	if bytes.Compare(tag, []byte(chunkTag)) != 0 {
 		return h, errors.New("invalid chunk header tag (open)")
+	}
+
+	// read the chunk type
+	t := []byte(chunkTypeData)
+	if _, err := r.Read(t); err != nil {
+		return h, err
+	}
+	if bytes.Compare(t, []byte(chunkTypeTomb)) == 0 {
+		h.tomb = true
 	}
 
 	// read nonce size
