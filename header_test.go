@@ -2,6 +2,8 @@ package crypto
 
 import (
 	"bytes"
+	"crypto/rand"
+	"io"
 	"testing"
 )
 
@@ -18,7 +20,7 @@ func TestHeaderInit(t *testing.T) {
 	}
 }
 
-func TestReadWrite(t *testing.T) {
+func TestHeaderReadWrite(t *testing.T) {
 	h := &header{}
 	h.init()
 
@@ -35,5 +37,20 @@ func TestReadWrite(t *testing.T) {
 
 	if err := h2.validate(); err != nil {
 		t.Error("error on validate: ", err)
+	}
+}
+
+func TestHeaderReadGibberish(t *testing.T) {
+	// create random input data
+	buf := make([]byte, headerSize)
+	if _, err := io.ReadFull(rand.Reader, buf); err != nil {
+		t.Error("rand.Reader failed?!", err)
+		return
+	}
+	r := bytes.NewReader(buf)
+
+	h := header{}
+	if err := h.read(r); err == nil {
+		t.Error("expected error")
 	}
 }

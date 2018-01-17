@@ -2,7 +2,9 @@ package crypto
 
 import (
 	"bytes"
+	"crypto/rand"
 	"fmt"
+	"io"
 	"testing"
 )
 
@@ -26,6 +28,20 @@ func TestReadWriteChunkHeader(t *testing.T) {
 
 	if err := compareChunkHeader(h, h2); err != nil {
 		t.Error("error on compare: ", err)
+	}
+}
+
+func TestReadChunkHeaderGibberish(t *testing.T) {
+	// create random input data
+	buf := make([]byte, chunkSize*2)
+	if _, err := io.ReadFull(rand.Reader, buf); err != nil {
+		t.Error("rand.Reader failed?!", err)
+		return
+	}
+	r := bytes.NewReader(buf)
+
+	if _, err := readChunkHeader(r, chunkSize); err == nil {
+		t.Error("expected error")
 	}
 }
 

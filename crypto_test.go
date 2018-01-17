@@ -2,6 +2,7 @@ package crypto
 
 import (
 	"bytes"
+	"crypto/rand"
 	"io"
 	"testing"
 )
@@ -35,7 +36,7 @@ func TestEncryptDecrypt(t *testing.T) {
 	}
 }
 
-func TestError(t *testing.T) {
+func TestTruncated(t *testing.T) {
 	sizes := []int{2, 10, 100, 1000, 1000 * 1024 * 100}
 	const key = "secret key"
 
@@ -57,6 +58,24 @@ func TestError(t *testing.T) {
 		if err := Decrypt(lr, pbuf, key); err == nil {
 			t.Error("expected error decrypting truncated buffer for size ", size)
 		}
+	}
+}
+
+func TestGibberish(t *testing.T) {
+	const key = "secret key"
+	const size = 1000 * 1024 * 10
+
+	// create random input data
+	cbuf := make([]byte, size)
+	if _, err := io.ReadFull(rand.Reader, cbuf); err != nil {
+		t.Error("rand.Reader failed?!", err)
+		return
+	}
+	r := bytes.NewReader(cbuf)
+
+	pbuf := &bytes.Buffer{}
+	if err := Decrypt(r, pbuf, key); err == nil {
+		t.Error("expected error decrypting gibberish")
 	}
 }
 
