@@ -14,9 +14,13 @@ const (
 	chunkSize = 1024 * 1000
 )
 
-// Encrypt reads from `r` until EOF and writes the encrypted contents to `w`
-// based on the specified key. Ideally the key should be unique for each Writer
-// instance.
+// Encrypt reads chunks of data from `r` writes the encrypted contents to `w`
+// based on the specified key. Reading continues until io.EOF.
+//
+// The key should be unique for each io.Reader instance.
+// For example, when encrypting files `skey` can be a secret plus the filespec
+// to ensure the key is unique for each file.
+//
 // Uses AES256 encryption and GCM authentication on chunks of size up to 1MB.
 func Encrypt(r io.Reader, w io.Writer, skey string) error {
 	gcm, err := getGCM(skey)
@@ -69,8 +73,8 @@ func Encrypt(r io.Reader, w io.Writer, skey string) error {
 	return writeChunkHeader(chunkHeader{nonce: nonce, size: 0, tomb: true}, w)
 }
 
-// Decrypt reads from `r` until EOF and writes the decrypted contents to `w`
-// based using the specified key.
+// Decrypt reads chunks of data from `r` and writes the decrypted
+// chunks to `w` using the specified key. Reading continues until io.EOF.
 func Decrypt(r io.Reader, w io.Writer, skey string) error {
 	gcm, err := getGCM(skey)
 	if err != nil {
