@@ -2,7 +2,7 @@
 // sets of data. For example this package can be used to encrypt/decrypt files.
 //
 // Data is read/written in chunks when encrypting and decrypting therefore the whole data set
-// does not need to reside in memory.
+// will not reside in memory at once.
 //
 // To encrypt data, provide an io.Reader interface to the plaintext data and an io.Writer which
 // will receive the encrypted data:
