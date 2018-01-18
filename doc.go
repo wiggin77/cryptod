@@ -4,12 +4,14 @@
 // Data is read/written in chunks when encrypting and decrypting therefore the whole data set
 // does not need to reside in memory.
 //
-// To encrypt data, provide an io.Reader interface to the plaintext data and call crypto.Encrypt:
+// To encrypt data, provide an io.Reader interface to the plaintext data and an io.Writer which
+// will receive the encrypted data:
 //  plaintext := bytes.NewReader([]byte("my secret data"))
 //  cryptbuf := bytes.Buffer{}
 //  err := Encrypt(plaintext, cryptbuf, "secret_key")
 //
-// To decrypt the data, provide an io.Reader interface to the encrypted data and call crypto.Decrypt:
+// To decrypt the data, provide an io.Reader interface to the encrypted data and an io.Writer which
+// will receive the plaintext:
 //  plainbuf := bytes.Buffer{}
 //  err := Decrypt(cryptbuf, plainbuf, "secret_key")
 package cryptod
