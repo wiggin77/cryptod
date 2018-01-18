@@ -1,4 +1,4 @@
-// Package crypto provides AES256-GCM encryption and decryption of arbitrarily large
+// Package cryptod provides AES256-GCM encryption and decryption of arbitrarily large
 // sets of data. For example this package can be used to encrypt/decrypt files.
 //
 // Data is read/written in chunks when encrypting and decrypting therefore the whole data set
@@ -12,4 +12,4 @@
 // To decrypt the data, provide an io.Reader interface to the encrypted data and call crypto.Decrypt:
 //  plainbuf := bytes.Buffer{}
 //  err := Decrypt(cryptbuf, plainbuf, "secret_key")
-package crypto
+package cryptod

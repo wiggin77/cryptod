@@ -1,4 +1,4 @@
-package crypto
+package cryptod
 
 import (
 	"crypto/aes"

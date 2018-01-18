@@ -1,4 +1,4 @@
-package crypto
+package cryptod
 
 import (
 	"bytes"
@@ -76,6 +76,49 @@ func TestGibberish(t *testing.T) {
 	pbuf := &bytes.Buffer{}
 	if err := Decrypt(r, pbuf, key); err == nil {
 		t.Error("expected error decrypting gibberish")
+	}
+}
+
+func TestBadKey(t *testing.T) {
+	const key = "this is a secret"
+	const keybad = "this is a "
+	plaintext := generatePlainText(1000 * 1024 * 10)
+
+	r := bytes.NewReader(plaintext)
+	buf := &bytes.Buffer{}
+
+	if err := Encrypt(r, buf, key); err != nil {
+		t.Error("encrypt error: ", err)
+		return
+	}
+
+	pbuf := &bytes.Buffer{}
+	err := Decrypt(buf, pbuf, keybad)
+	if err == nil {
+		t.Error("expected a decrypt error with bad key")
+	}
+}
+
+func TestTamper(t *testing.T) {
+	const key = "this is a secret"
+	plaintext := generatePlainText(1000 * 1024 * 10)
+
+	r := bytes.NewReader(plaintext)
+	buf := &bytes.Buffer{}
+
+	if err := Encrypt(r, buf, key); err != nil {
+		t.Error("encrypt error: ", err)
+		return
+	}
+
+	// tamper with one byte of the encrypted buffer
+	b := buf.Bytes()
+	b[2048] = b[2048] + 1
+
+	pbuf := &bytes.Buffer{}
+	err := Decrypt(buf, pbuf, key)
+	if err == nil {
+		t.Error("expected a decrypt error with tampered byte")
 	}
 }
 
