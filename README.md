@@ -11,3 +11,5 @@ Also see [crypto_test.go](https://github.com/wiggin77/cryptod/blob/master/crypto
  that encrypts/decrypts files.
 
 
+## Disclaimer
+This package is fresh from the oven - use at your own risk while in alpha.
