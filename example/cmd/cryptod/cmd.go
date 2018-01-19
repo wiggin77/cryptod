@@ -39,5 +39,10 @@ func cmd(encrypt bool, fileIn string, fileOut string, skey string) error {
 	} else {
 		err = cryptod.Decrypt(r, w, skey)
 	}
+
+	if err != nil {
+		w.Close()
+		os.Remove(fileOut)
+	}
 	return err
 }
