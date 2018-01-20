@@ -1,1 +1,2 @@
+#!/bin/sh -
 go run main.go cmd.go $1 $2 $3 $4 $5
