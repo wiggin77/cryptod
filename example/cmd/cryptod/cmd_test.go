@@ -1,3 +1,6 @@
+// Package main_test provides a simple test of the cryptod sample app.
+// +build linux
+
 package main_test
 
 import (
