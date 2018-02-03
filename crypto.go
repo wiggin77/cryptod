@@ -53,7 +53,7 @@ func Encrypt(r io.Reader, w io.Writer, skey string) error {
 			c := gcm.Seal(cbuf[:0], nonce, p, nil)
 			var clen = uint32(len(c))
 			if clen > 0 {
-				// write a chunk tag containing actual encrypted block size
+				// write a chunk header containing actual encrypted block size
 				if err := writeChunkHeader(chunkHeader{nonce: nonce, size: clen}, w); err != nil {
 					return err
 				}
