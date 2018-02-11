@@ -54,7 +54,7 @@ func Encrypt(r io.Reader, w io.Writer, skey string) error {
 			var clen = uint32(len(c))
 			if clen > 0 {
 				// write a chunk header containing actual encrypted block size
-				if err := writeChunkHeader(chunkHeader{nonce: nonce, size: clen}, w); err != nil {
+				if err := writeChunkHeader(chunkHeader{ct: chunkTypeAES256, nonce: nonce, dataSize: clen}, w); err != nil {
 					return err
 				}
 				// write encrypted data to output steam
@@ -70,7 +70,7 @@ func Encrypt(r io.Reader, w io.Writer, skey string) error {
 	}
 	// write the tomb chunk header
 	io.ReadFull(rand.Reader, nonce)
-	return writeChunkHeader(chunkHeader{nonce: nonce, size: 0, tomb: true}, w)
+	return writeChunkHeader(chunkHeader{ct: chunkTypeTomb, nonce: nonce, dataSize: 0}, w)
 }
 
 // Decrypt reads chunks of data from `r` and writes the decrypted

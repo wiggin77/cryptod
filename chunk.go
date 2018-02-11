@@ -1,6 +1,7 @@
 package cryptod
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/binary"
 	"errors"
@@ -8,56 +9,71 @@ import (
 	"io"
 )
 
-const (
-	chunkTag      = "ct"
-	chunkTypeData = "d"
-	chunkTypeTomb = "t"
+type chunkType byte
+
+var (
+	chunkTag = []byte{'c', 't'}
 )
 
+const (
+	chunkTypeAES256 chunkType = 0x01
+	chunkTypeExtra  chunkType = 0xF0
+	chunkTypeTomb   chunkType = 0xF1
+)
+
+// Chunk is comprised of a chunk header followed by 0 or more
+// bytes of encrypted data.
+
+// chunkHeader describes the layout of a chunk.
+// A chunk con
 type chunkHeader struct {
-	nonce []byte
-	size  uint32
-	tomb  bool
+	ct       chunkType // the chunk type
+	nonce    []byte    // nonce
+	dataSize uint32    // size of encrypted data in bytes
 }
 
-// writes a chunk header, containing the tag id, nonce and chunk size
+// checkChunkType determines if the chunk type `ct` is valid.
+func checkChunkType(ct chunkType) error {
+	var err error
+	switch ct {
+	case chunkTypeAES256:
+	case chunkTypeExtra:
+	case chunkTypeTomb:
+	default:
+		err = errors.New("invalid chunk type")
+	}
+	return err
+}
+
+// writeChunkHeader writes a chunk header
 func writeChunkHeader(ch chunkHeader, w io.Writer) error {
-	// write the tag (open)
-	tag := []byte(chunkTag)
-	if _, err := w.Write(tag); err != nil {
+	if err := checkChunkType(ch.ct); err != nil {
+		return err
+	}
+	bw := bufio.NewWriter(w)
+
+	// write the tag
+	if _, err := bw.Write(chunkTag); err != nil {
 		return err
 	}
 
 	// write the chunk type
-	var t []byte
-	if ch.tomb {
-		t = []byte(chunkTypeTomb)
-	} else {
-		t = []byte(chunkTypeData)
-	}
-	if _, err := w.Write(t); err != nil {
+	if err := bw.WriteByte(byte(ch.ct)); err != nil {
 		return err
 	}
 
 	// write the nonce size, followed by nonce
-	sizeNonce := make([]byte, binary.MaxVarintLen16)
-	binary.PutUvarint(sizeNonce, uint64(len(ch.nonce)))
-	if _, err := w.Write(sizeNonce); err != nil {
+	if err := bw.WriteByte(byte(len(ch.nonce))); err != nil {
 		return err
 	}
-	if _, err := w.Write(ch.nonce); err != nil {
+	if _, err := bw.Write(ch.nonce); err != nil {
 		return err
 	}
 
 	// write the chunk size
 	sizeChunk := make([]byte, binary.MaxVarintLen32)
-	binary.PutUvarint(sizeChunk, uint64(ch.size))
-	if _, err := w.Write(sizeChunk); err != nil {
-		return err
-	}
-
-	// write the tag (close)
-	if _, err := w.Write(tag); err != nil {
+	binary.PutUvarint(sizeChunk, uint64(ch.dataSize))
+	if _, err := bw.Write(sizeChunk); err != nil {
 		return err
 	}
 	return nil
@@ -66,67 +82,53 @@ func writeChunkHeader(ch chunkHeader, w io.Writer) error {
 // reads a chunk header
 func readChunkHeader(r io.Reader, maxChunkSize int) (chunkHeader, error) {
 	h := chunkHeader{}
+	br := bufio.NewReader(r)
+	var err error
 
-	// read the tag (open)
+	// read the tag
 	taglen := len(chunkTag)
 	tag := make([]byte, taglen)
-	if _, err := r.Read(tag); err != nil {
+	if _, err = br.Read(tag); err != nil {
 		return h, err
 	}
-	if bytes.Compare(tag, []byte(chunkTag)) != 0 {
-		return h, errors.New("invalid chunk header tag (open)")
+	if bytes.Compare(tag, chunkTag) != 0 {
+		return h, errors.New("invalid chunk tag")
 	}
 
 	// read the chunk type
-	t := []byte(chunkTypeData)
-	if _, err := r.Read(t); err != nil {
+	var ct byte
+	if ct, err = br.ReadByte(); err != nil {
 		return h, err
 	}
-	if bytes.Compare(t, []byte(chunkTypeTomb)) == 0 {
-		h.tomb = true
+	h.ct = chunkType(ct)
+	if err := checkChunkType(h.ct); err != nil {
+		return h, err
 	}
 
 	// read nonce size
-	sizeNonce := make([]byte, binary.MaxVarintLen16)
-	if _, err := r.Read(sizeNonce); err != nil {
+	var nsize byte
+	if nsize, err = br.ReadByte(); err != nil {
 		return h, err
-	}
-	val, err := binary.ReadUvarint(bytes.NewReader(sizeNonce))
-	if err != nil {
-		return h, err
-	}
-	size := uint32(val)
-	if size > 128 { // sanity check
-		return h, fmt.Errorf("invalid nonce size: %d", size)
 	}
 
 	// read nonce
-	h.nonce = make([]byte, size)
-	if _, err := r.Read(h.nonce); err != nil {
+	h.nonce = make([]byte, nsize)
+	if _, err := br.Read(h.nonce); err != nil {
 		return h, err
 	}
 
 	// read chunk size
 	sizeChunk := make([]byte, binary.MaxVarintLen32)
-	if _, err := r.Read(sizeChunk); err != nil {
+	if _, err = br.Read(sizeChunk); err != nil {
 		return h, err
 	}
-	val, err = binary.ReadUvarint(bytes.NewReader(sizeChunk))
+	val, err := binary.ReadUvarint(bytes.NewReader(sizeChunk))
 	if err != nil {
 		return h, err
 	}
-	h.size = uint32(val)
-	if h.size > uint32(maxChunkSize) {
-		return h, fmt.Errorf("invalid chunk size: %d, max=%d", h.size, maxChunkSize)
-	}
-
-	// read the tag (close)
-	tag = make([]byte, taglen)
-	if _, err := r.Read(tag); err != nil {
-		return h, err
-	}
-	if bytes.Compare(tag, []byte(chunkTag)) != 0 {
-		return h, errors.New("invalid chunk header tag (close)")
+	h.dataSize = uint32(val)
+	if h.dataSize > uint32(maxChunkSize) {
+		return h, fmt.Errorf("invalid chunk size: %d, max=%d", h.dataSize, maxChunkSize)
 	}
 	// header ok
 	return h, nil
