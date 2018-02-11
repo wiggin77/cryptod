@@ -10,6 +10,7 @@ import (
 func TestEncryptDecrypt(t *testing.T) {
 	sizes := []int{0, 1, 10, 100, 1000, 1000 * 1024 * 100}
 	const key = "secret key"
+	const extra = "Wake up, Neo..."
 
 	// encrypt then decrypt and check results
 	for _, size := range sizes {
@@ -18,14 +19,17 @@ func TestEncryptDecrypt(t *testing.T) {
 		r := bytes.NewReader(plaintext)
 		buf := &bytes.Buffer{}
 
-		if err := Encrypt(r, buf, key); err != nil {
+		if err := Encrypt(r, buf, key, []byte(extra)); err != nil {
 			t.Errorf("encrypt error for size %d: %v", size, err)
 			break
 		}
 
 		pbuf := &bytes.Buffer{}
-		if err := Decrypt(buf, pbuf, key); err != nil {
+		if ext, err := Decrypt(buf, pbuf, key); err != nil {
 			t.Errorf("decrypt error for size %d: %v", size, err)
+			break
+		} else if bytes.Compare([]byte(extra), ext) != 0 {
+			t.Errorf("extra data mismatch for size %d: %v", size, ext)
 			break
 		}
 
@@ -46,7 +50,7 @@ func TestTruncated(t *testing.T) {
 		r := bytes.NewReader(plaintext)
 		buf := &bytes.Buffer{}
 
-		if err := Encrypt(r, buf, key); err != nil {
+		if err := Encrypt(r, buf, key, nil); err != nil {
 			t.Error("encrypt error: ", err)
 		}
 
@@ -55,7 +59,7 @@ func TestTruncated(t *testing.T) {
 		half := int64(buf.Len() / 2)
 		lr := io.LimitReader(buf, half)
 
-		if err := Decrypt(lr, pbuf, key); err == nil {
+		if _, err := Decrypt(lr, pbuf, key); err == nil {
 			t.Error("expected error decrypting truncated buffer for size ", size)
 		}
 	}
@@ -74,7 +78,7 @@ func TestGibberish(t *testing.T) {
 	r := bytes.NewReader(cbuf)
 
 	pbuf := &bytes.Buffer{}
-	if err := Decrypt(r, pbuf, key); err == nil {
+	if _, err := Decrypt(r, pbuf, key); err == nil {
 		t.Error("expected error decrypting gibberish")
 	}
 }
@@ -87,13 +91,13 @@ func TestBadKey(t *testing.T) {
 	r := bytes.NewReader(plaintext)
 	buf := &bytes.Buffer{}
 
-	if err := Encrypt(r, buf, key); err != nil {
+	if err := Encrypt(r, buf, key, nil); err != nil {
 		t.Error("encrypt error: ", err)
 		return
 	}
 
 	pbuf := &bytes.Buffer{}
-	err := Decrypt(buf, pbuf, keybad)
+	_, err := Decrypt(buf, pbuf, keybad)
 	if err == nil {
 		t.Error("expected a decrypt error with bad key")
 	}
@@ -106,7 +110,7 @@ func TestTamper(t *testing.T) {
 	r := bytes.NewReader(plaintext)
 	buf := &bytes.Buffer{}
 
-	if err := Encrypt(r, buf, key); err != nil {
+	if err := Encrypt(r, buf, key, nil); err != nil {
 		t.Error("encrypt error: ", err)
 		return
 	}
@@ -116,7 +120,7 @@ func TestTamper(t *testing.T) {
 	b[2048] = b[2048] + 1
 
 	pbuf := &bytes.Buffer{}
-	err := Decrypt(buf, pbuf, key)
+	_, err := Decrypt(buf, pbuf, key)
 	if err == nil {
 		t.Error("expected a decrypt error with tampered byte")
 	}

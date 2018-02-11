@@ -10,37 +10,51 @@ import (
 )
 
 type chunkType byte
+type schemeType byte
 
 var (
 	chunkTag = []byte{'c', 't'}
 )
 
 const (
-	chunkTypeAES256 chunkType = 0x01
-	chunkTypeExtra  chunkType = 0xF0
-	chunkTypeTomb   chunkType = 0xF1
+	chunkTypeData  chunkType = 0x01
+	chunkTypeExtra chunkType = 0xF0
+	chunkTypeTomb  chunkType = 0xF1
+
+	schemeAES256GCM schemeType = 0x01
 )
 
 // Chunk is comprised of a chunk header followed by 0 or more
 // bytes of encrypted data.
 
 // chunkHeader describes the layout of a chunk.
-// A chunk con
 type chunkHeader struct {
-	ct       chunkType // the chunk type
-	nonce    []byte    // nonce
-	dataSize uint32    // size of encrypted data in bytes
+	ct       chunkType  // the chunk type
+	st       schemeType // scheme type (cipher plus envelope)
+	nonce    []byte     // nonce
+	dataSize uint32     // size of encrypted data in bytes
 }
 
 // checkChunkType determines if the chunk type `ct` is valid.
 func checkChunkType(ct chunkType) error {
 	var err error
 	switch ct {
-	case chunkTypeAES256:
+	case chunkTypeData:
 	case chunkTypeExtra:
 	case chunkTypeTomb:
 	default:
-		err = errors.New("invalid chunk type")
+		err = fmt.Errorf("invalid chunk type: %d", ct)
+	}
+	return err
+}
+
+// checkScheme determines if the scheme is valid.
+func checkSchemeType(st schemeType) error {
+	var err error
+	switch st {
+	case schemeAES256GCM:
+	default:
+		err = fmt.Errorf("invalid scheme: %d", st)
 	}
 	return err
 }
@@ -48,6 +62,9 @@ func checkChunkType(ct chunkType) error {
 // writeChunkHeader writes a chunk header
 func writeChunkHeader(ch chunkHeader, w io.Writer) error {
 	if err := checkChunkType(ch.ct); err != nil {
+		return err
+	}
+	if err := checkSchemeType(ch.st); err != nil {
 		return err
 	}
 	bw := bufio.NewWriter(w)
@@ -59,6 +76,11 @@ func writeChunkHeader(ch chunkHeader, w io.Writer) error {
 
 	// write the chunk type
 	if err := bw.WriteByte(byte(ch.ct)); err != nil {
+		return err
+	}
+
+	// write the scheme type
+	if err := bw.WriteByte(byte(ch.st)); err != nil {
 		return err
 	}
 
@@ -102,6 +124,16 @@ func readChunkHeader(r io.Reader, maxChunkSize int) (chunkHeader, error) {
 	}
 	h.ct = chunkType(ct)
 	if err := checkChunkType(h.ct); err != nil {
+		return h, err
+	}
+
+	// read the scheme type
+	var st byte
+	if st, err = br.ReadByte(); err != nil {
+		return h, err
+	}
+	h.st = schemeType(st)
+	if err := checkSchemeType(h.st); err != nil {
 		return h, err
 	}
 

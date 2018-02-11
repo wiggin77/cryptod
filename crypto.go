@@ -22,8 +22,14 @@ const (
 // to ensure the key is unique for each file.
 //
 // Uses AES256 encryption and GCM authentication on chunks of size up to 1MB.
-func Encrypt(r io.Reader, w io.Writer, skey string) error {
-	gcm, err := getGCM(skey)
+func Encrypt(r io.Reader, w io.Writer, skey string, extra []byte) error {
+	if len(extra) > chunkSize {
+		return fmt.Errorf("extra data too big (len=%d), must be less than %d bytes",
+			len(extra), chunkSize)
+	}
+
+	// TODO: allow additonal ciphers?
+	gcm, err := getGCM(skey, schemeAES256GCM)
 	if err != nil {
 		return err
 	}
@@ -34,13 +40,20 @@ func Encrypt(r io.Reader, w io.Writer, skey string) error {
 	cbuf := make([]byte, len(pbuf)+gcm.Overhead())
 	var ctr uint32 = 1
 
-	// write the stream header
-	if err = writeHeader(w); err != nil {
-		return err
-	}
-
 	for {
-		n, readErr := r.Read(pbuf)
+		var n int
+		var readErr error
+		var ct chunkType
+		if extra != nil && len(extra) > 0 {
+			// write the extra data first, but only once
+			n = copy(pbuf, extra)
+			ct = chunkTypeExtra
+			readErr = nil
+			extra = nil
+		} else {
+			n, readErr = r.Read(pbuf)
+			ct = chunkTypeData
+		}
 		if n > 0 {
 			p := pbuf[:n]
 			// randomize the nonce
@@ -54,7 +67,7 @@ func Encrypt(r io.Reader, w io.Writer, skey string) error {
 			var clen = uint32(len(c))
 			if clen > 0 {
 				// write a chunk header containing actual encrypted block size
-				if err := writeChunkHeader(chunkHeader{ct: chunkTypeAES256, nonce: nonce, dataSize: clen}, w); err != nil {
+				if err := writeChunkHeader(chunkHeader{ct: ct, st: schemeAES256GCM, nonce: nonce, dataSize: clen}, w); err != nil {
 					return err
 				}
 				// write encrypted data to output steam
@@ -73,64 +86,110 @@ func Encrypt(r io.Reader, w io.Writer, skey string) error {
 	return writeChunkHeader(chunkHeader{ct: chunkTypeTomb, nonce: nonce, dataSize: 0}, w)
 }
 
+type readCtx struct {
+	gcm cipher.AEAD
+	st  schemeType
+	r   io.Reader
+	buf []byte
+}
+
 // Decrypt reads chunks of data from `r` and writes the decrypted
 // chunks to `w` using the specified key. Reading continues until io.EOF.
-func Decrypt(r io.Reader, w io.Writer, skey string) error {
-	gcm, err := getGCM(skey)
-	if err != nil {
-		return err
+// Returns any extra data included in the steam, or error.
+func Decrypt(r io.Reader, w io.Writer, skey string) ([]byte, error) {
+	var err error
+	var extra []byte
+	rctx := readCtx{}
+	if rctx.gcm, err = getGCM(skey, schemeAES256GCM); err != nil {
+		return extra, err
 	}
+	rctx.st = schemeAES256GCM
 
-	maxChunkSize := chunkSize + gcm.Overhead()
+	maxChunkSize := chunkSize + rctx.gcm.Overhead()
 	maxChunkSizeSanity := maxChunkSize * 2
 
-	// reuse buffers to reduce GC
-	buf := make([]byte, maxChunkSize)
-
-	// read and validate the header
-	h := header{}
-	if err := h.read(r); err != nil {
-		return err
-	}
+	// reuse buffer to reduce GC
+	rctx.buf = make([]byte, maxChunkSize)
 
 	for {
 		// read next chunk header
 		var ch chunkHeader
 		ch, err = readChunkHeader(r, maxChunkSizeSanity)
-		if err != nil && !ch.tomb {
-			return err
+		if err != nil && ch.ct != chunkTypeTomb {
+			return extra, err
 		}
-		if ch.tomb {
-			break // tomb chunk header means we're done
+		// tomb chunk header means we're done
+		if ch.ct == chunkTypeTomb {
+			break
 		}
-		// ensure cbuf is big enough
-		if cap(buf) < int(ch.size) {
-			buf = make([]byte, ch.size)
+		// check if scheme changed and is supported.
+		if ch.st != rctx.st {
+			if rctx.gcm, err = getGCM(skey, ch.st); err != nil {
+				return extra, err
+			}
+			rctx.st = ch.st
 		}
-		// read the encrypted chunk
-		cbuf := buf[:ch.size]
-		n, readErr := r.Read(cbuf)
-		if readErr != nil && readErr != io.EOF {
-			return readErr
-		}
-		if n != int(ch.size) {
-			return fmt.Errorf("wrong chunk size read, expected %d, got %d", ch.size, n)
-		}
-		// decrypt the chunk
+		// read and decrypt
 		var pbuf []byte
-		if pbuf, err = gcm.Open(cbuf[:0], ch.nonce, cbuf, nil); err != nil {
-			return err
+		if pbuf, err = readEncryptedChunk(rctx, ch); err != nil {
+			return extra, err
 		}
-		// write plaintext to w
-		if _, err := w.Write(pbuf); err != nil {
-			return err
+		rctx.buf = pbuf
+
+		// handle chunk type
+		switch ch.ct {
+		case chunkTypeExtra:
+			copy(extra, pbuf)
+		case chunkTypeData:
+			// write plaintext to w
+			if _, err := w.Write(pbuf); err != nil {
+				return extra, err
+			}
+		default:
+			return extra, fmt.Errorf("invalid chunk type: %d", ch.ct)
 		}
 	}
-	return nil
+	return extra, nil
 }
 
-// getGCM returns a AES256 block cipher wrapped in GCM.
-func getGCM(skey string) (cipher.AEAD, error) {
+// readEncryptedChunk reads and decrypts a chunk of data.
+func readEncryptedChunk(rctx readCtx, ch chunkHeader) ([]byte, error) {
+	// ensure buf is big enough; ch.dataSize already sanity checked in readChunkHeader
+	buf := rctx.buf
+	size := int(ch.dataSize)
+	if cap(buf) < size {
+		buf = make([]byte, size)
+	}
+	// read the encrypted chunk
+	var err error
+	cbuf := buf[:size]
+	n, err := rctx.r.Read(cbuf)
+	if err != nil && err != io.EOF {
+		return nil, err
+	}
+	if n != size {
+		return buf, fmt.Errorf("wrong chunk size read, expected %d, got %d", size, n)
+	}
+	// decrypt the chunk
+	var pbuf []byte
+	if pbuf, err = rctx.gcm.Open(cbuf[:0], ch.nonce, cbuf, nil); err != nil {
+		return nil, err
+	}
+	return pbuf, nil
+}
+
+// getGCM returns a block cipher wrapped in GCM.
+func getGCM(skey string, st schemeType) (cipher.AEAD, error) {
+	switch st {
+	case schemeAES256GCM:
+		return getAES256GCM(skey)
+		// TODO: support more ciphers?
+	}
+	return nil, fmt.Errorf("unsupported scheme: %d", st)
+}
+
+// getAES256GCM returns a AES256 block cipher wrapped in GCM.
+func getAES256GCM(skey string) (cipher.AEAD, error) {
 	// key must be hashed to 32 bytes for AES256
 	key := sha512.Sum512_256([]byte(skey))
 
@@ -143,11 +202,4 @@ func getGCM(skey string) (cipher.AEAD, error) {
 		return nil, err
 	}
 	return gcm, nil
-}
-
-// writes a file header
-func writeHeader(w io.Writer) error {
-	h := header{}
-	h.init()
-	return h.write(w)
 }
