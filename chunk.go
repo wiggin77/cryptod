@@ -98,7 +98,7 @@ func writeChunkHeader(ch chunkHeader, w io.Writer) error {
 	if _, err := bw.Write(sizeChunk); err != nil {
 		return err
 	}
-	return nil
+	return bw.Flush()
 }
 
 // reads a chunk header

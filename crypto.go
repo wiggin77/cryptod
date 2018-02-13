@@ -55,7 +55,6 @@ func Encrypt(r io.Reader, w io.Writer, skey string, extra []byte) error {
 			ct = chunkTypeData
 		}
 		if n > 0 {
-			p := pbuf[:n]
 			// randomize the nonce
 			if _, err := io.ReadFull(rand.Reader, nonce[binary.MaxVarintLen32:]); err != nil {
 				return err
@@ -63,6 +62,7 @@ func Encrypt(r io.Reader, w io.Writer, skey string, extra []byte) error {
 			binary.PutUvarint(nonce, uint64(ctr))
 			ctr++
 			// encrypt and authenticate
+			p := pbuf[:n]
 			c := gcm.Seal(cbuf[:0], nonce, p, nil)
 			var clen = uint32(len(c))
 			if clen > 0 {
@@ -83,7 +83,7 @@ func Encrypt(r io.Reader, w io.Writer, skey string, extra []byte) error {
 	}
 	// write the tomb chunk header
 	io.ReadFull(rand.Reader, nonce)
-	return writeChunkHeader(chunkHeader{ct: chunkTypeTomb, nonce: nonce, dataSize: 0}, w)
+	return writeChunkHeader(chunkHeader{ct: chunkTypeTomb, st: schemeAES256GCM, nonce: nonce, dataSize: 0}, w)
 }
 
 type readCtx struct {
@@ -104,6 +104,7 @@ func Decrypt(r io.Reader, w io.Writer, skey string) ([]byte, error) {
 		return extra, err
 	}
 	rctx.st = schemeAES256GCM
+	rctx.r = r
 
 	maxChunkSize := chunkSize + rctx.gcm.Overhead()
 	maxChunkSizeSanity := maxChunkSize * 2
@@ -114,7 +115,7 @@ func Decrypt(r io.Reader, w io.Writer, skey string) ([]byte, error) {
 	for {
 		// read next chunk header
 		var ch chunkHeader
-		ch, err = readChunkHeader(r, maxChunkSizeSanity)
+		ch, err = readChunkHeader(rctx.r, maxChunkSizeSanity)
 		if err != nil && ch.ct != chunkTypeTomb {
 			return extra, err
 		}
@@ -160,20 +161,25 @@ func readEncryptedChunk(rctx readCtx, ch chunkHeader) ([]byte, error) {
 	if cap(buf) < size {
 		buf = make([]byte, size)
 	}
-	// read the encrypted chunk
-	var err error
-	cbuf := buf[:size]
-	n, err := rctx.r.Read(cbuf)
-	if err != nil && err != io.EOF {
-		return nil, err
-	}
-	if n != size {
-		return buf, fmt.Errorf("wrong chunk size read, expected %d, got %d", size, n)
-	}
-	// decrypt the chunk
+
 	var pbuf []byte
-	if pbuf, err = rctx.gcm.Open(cbuf[:0], ch.nonce, cbuf, nil); err != nil {
-		return nil, err
+	if size > 0 {
+		// read the encrypted chunk
+		var err error
+		cbuf := buf[:size]
+		n, err := rctx.r.Read(cbuf)
+		if err != nil && err != io.EOF {
+			return nil, err
+		}
+		if n != size {
+			return buf, fmt.Errorf("wrong chunk size read, expected %d, got %d", size, n)
+		}
+		// decrypt the chunk
+		if pbuf, err = rctx.gcm.Open(cbuf[:0], ch.nonce, cbuf, nil); err != nil {
+			return nil, err
+		}
+	} else {
+		pbuf = buf[0:0]
 	}
 	return pbuf, nil
 }
