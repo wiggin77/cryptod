@@ -1,6 +1,7 @@
 package cryptod
 
 import (
+	"bufio"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
@@ -11,7 +12,8 @@ import (
 )
 
 const (
-	chunkSize = 1024 * 1000
+	// ChunkSize is the maximum size of an individual chunk in the encrypted stream.
+	ChunkSize = 1024 * 1000
 )
 
 // Encrypt reads chunks of data from `r` writes the encrypted contents to `w`
@@ -21,21 +23,27 @@ const (
 // For example, when encrypting files `skey` can be a secret plus the filespec
 // to ensure the key is unique for each file.
 //
+// Extra data, up to `ChunkSize` (1MB), can be encrypted with the stream, and will
+// be returned when decrypted.
+//
 // Uses AES256 encryption and GCM authentication on chunks of size up to 1MB.
-func Encrypt(r io.Reader, w io.Writer, skey string, extra []byte) error {
-	if len(extra) > chunkSize {
+func Encrypt(reader io.Reader, writer io.Writer, skey string, extra []byte) error {
+	if len(extra) > ChunkSize {
 		return fmt.Errorf("extra data too big (len=%d), must be less than %d bytes",
-			len(extra), chunkSize)
+			len(extra), ChunkSize)
 	}
+	br := bufio.NewReader(reader)
+	bw := bufio.NewWriter(writer)
+	defer bw.Flush()
 
-	// TODO: allow additonal ciphers?
+	// TODO: allow additonal ciphers... which ones?
 	gcm, err := getGCM(skey, schemeAES256GCM)
 	if err != nil {
 		return err
 	}
 
 	// reuse buffers to reduce GC
-	pbuf := make([]byte, chunkSize)
+	pbuf := make([]byte, ChunkSize)
 	nonce := make([]byte, gcm.NonceSize())
 	cbuf := make([]byte, len(pbuf)+gcm.Overhead())
 	var ctr uint32 = 1
@@ -51,7 +59,7 @@ func Encrypt(r io.Reader, w io.Writer, skey string, extra []byte) error {
 			readErr = nil
 			extra = nil
 		} else {
-			n, readErr = r.Read(pbuf)
+			n, readErr = br.Read(pbuf)
 			ct = chunkTypeData
 		}
 		if n > 0 {
@@ -67,11 +75,11 @@ func Encrypt(r io.Reader, w io.Writer, skey string, extra []byte) error {
 			var clen = uint32(len(c))
 			if clen > 0 {
 				// write a chunk header containing actual encrypted block size
-				if err := writeChunkHeader(chunkHeader{ct: ct, st: schemeAES256GCM, nonce: nonce, dataSize: clen}, w); err != nil {
+				if err := writeChunkHeader(chunkHeader{ct: ct, st: schemeAES256GCM, nonce: nonce, dataSize: clen}, bw); err != nil {
 					return err
 				}
 				// write encrypted data to output steam
-				if _, err := w.Write(c); err != nil {
+				if _, err := bw.Write(c); err != nil {
 					return err
 				}
 			}
@@ -83,20 +91,20 @@ func Encrypt(r io.Reader, w io.Writer, skey string, extra []byte) error {
 	}
 	// write the tomb chunk header
 	io.ReadFull(rand.Reader, nonce)
-	return writeChunkHeader(chunkHeader{ct: chunkTypeTomb, st: schemeAES256GCM, nonce: nonce, dataSize: 0}, w)
+	return writeChunkHeader(chunkHeader{ct: chunkTypeTomb, st: schemeAES256GCM, nonce: nonce, dataSize: 0}, bw)
 }
 
 type readCtx struct {
 	gcm cipher.AEAD
 	st  schemeType
-	r   io.Reader
+	br  *bufio.Reader
 	buf []byte
 }
 
 // Decrypt reads chunks of data from `r` and writes the decrypted
 // chunks to `w` using the specified key. Reading continues until io.EOF.
 // Returns any extra data included in the steam, or error.
-func Decrypt(r io.Reader, w io.Writer, skey string) ([]byte, error) {
+func Decrypt(reader io.Reader, writer io.Writer, skey string) ([]byte, error) {
 	var err error
 	var extra []byte
 	rctx := readCtx{}
@@ -104,9 +112,11 @@ func Decrypt(r io.Reader, w io.Writer, skey string) ([]byte, error) {
 		return extra, err
 	}
 	rctx.st = schemeAES256GCM
-	rctx.r = r
+	rctx.br = bufio.NewReader(reader)
+	bw := bufio.NewWriter(writer)
+	defer bw.Flush()
 
-	maxChunkSize := chunkSize + rctx.gcm.Overhead()
+	maxChunkSize := ChunkSize + rctx.gcm.Overhead()
 	maxChunkSizeSanity := maxChunkSize * 2
 
 	// reuse buffer to reduce GC
@@ -115,7 +125,7 @@ func Decrypt(r io.Reader, w io.Writer, skey string) ([]byte, error) {
 	for {
 		// read next chunk header
 		var ch chunkHeader
-		ch, err = readChunkHeader(rctx.r, maxChunkSizeSanity)
+		ch, err = readChunkHeader(rctx.br, maxChunkSizeSanity)
 		if err != nil && ch.ct != chunkTypeTomb {
 			return extra, err
 		}
@@ -135,15 +145,15 @@ func Decrypt(r io.Reader, w io.Writer, skey string) ([]byte, error) {
 		if pbuf, err = readEncryptedChunk(rctx, ch); err != nil {
 			return extra, err
 		}
-		rctx.buf = pbuf
+		rctx.buf = pbuf // re-use the possibly resized buffer
 
 		// handle chunk type
 		switch ch.ct {
 		case chunkTypeExtra:
-			copy(extra, pbuf)
+			extra = append(extra, pbuf...)
 		case chunkTypeData:
 			// write plaintext to w
-			if _, err := w.Write(pbuf); err != nil {
+			if _, err := bw.Write(pbuf); err != nil {
 				return extra, err
 			}
 		default:
@@ -167,7 +177,7 @@ func readEncryptedChunk(rctx readCtx, ch chunkHeader) ([]byte, error) {
 		// read the encrypted chunk
 		var err error
 		cbuf := buf[:size]
-		n, err := rctx.r.Read(cbuf)
+		n, err := rctx.br.Read(cbuf)
 		if err != nil && err != io.EOF {
 			return nil, err
 		}

@@ -6,7 +6,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"io"
 )
 
 type chunkType byte
@@ -60,57 +59,55 @@ func checkSchemeType(st schemeType) error {
 }
 
 // writeChunkHeader writes a chunk header
-func writeChunkHeader(ch chunkHeader, w io.Writer) error {
+func writeChunkHeader(ch chunkHeader, w *bufio.Writer) error {
 	if err := checkChunkType(ch.ct); err != nil {
 		return err
 	}
 	if err := checkSchemeType(ch.st); err != nil {
 		return err
 	}
-	bw := bufio.NewWriter(w)
 
 	// write the tag
-	if _, err := bw.Write(chunkTag); err != nil {
+	if _, err := w.Write(chunkTag); err != nil {
 		return err
 	}
 
 	// write the chunk type
-	if err := bw.WriteByte(byte(ch.ct)); err != nil {
+	if err := w.WriteByte(byte(ch.ct)); err != nil {
 		return err
 	}
 
 	// write the scheme type
-	if err := bw.WriteByte(byte(ch.st)); err != nil {
+	if err := w.WriteByte(byte(ch.st)); err != nil {
 		return err
 	}
 
 	// write the nonce size, followed by nonce
-	if err := bw.WriteByte(byte(len(ch.nonce))); err != nil {
+	if err := w.WriteByte(byte(len(ch.nonce))); err != nil {
 		return err
 	}
-	if _, err := bw.Write(ch.nonce); err != nil {
+	if _, err := w.Write(ch.nonce); err != nil {
 		return err
 	}
 
 	// write the chunk size
 	sizeChunk := make([]byte, binary.MaxVarintLen32)
 	binary.PutUvarint(sizeChunk, uint64(ch.dataSize))
-	if _, err := bw.Write(sizeChunk); err != nil {
+	if _, err := w.Write(sizeChunk); err != nil {
 		return err
 	}
-	return bw.Flush()
+	return w.Flush()
 }
 
 // reads a chunk header
-func readChunkHeader(r io.Reader, maxChunkSize int) (chunkHeader, error) {
+func readChunkHeader(r *bufio.Reader, maxChunkSize int) (chunkHeader, error) {
 	h := chunkHeader{}
-	br := bufio.NewReader(r)
 	var err error
 
 	// read the tag
 	taglen := len(chunkTag)
 	tag := make([]byte, taglen)
-	if _, err = br.Read(tag); err != nil {
+	if _, err = r.Read(tag); err != nil {
 		return h, err
 	}
 	if bytes.Compare(tag, chunkTag) != 0 {
@@ -119,7 +116,7 @@ func readChunkHeader(r io.Reader, maxChunkSize int) (chunkHeader, error) {
 
 	// read the chunk type
 	var ct byte
-	if ct, err = br.ReadByte(); err != nil {
+	if ct, err = r.ReadByte(); err != nil {
 		return h, err
 	}
 	h.ct = chunkType(ct)
@@ -129,7 +126,7 @@ func readChunkHeader(r io.Reader, maxChunkSize int) (chunkHeader, error) {
 
 	// read the scheme type
 	var st byte
-	if st, err = br.ReadByte(); err != nil {
+	if st, err = r.ReadByte(); err != nil {
 		return h, err
 	}
 	h.st = schemeType(st)
@@ -139,19 +136,19 @@ func readChunkHeader(r io.Reader, maxChunkSize int) (chunkHeader, error) {
 
 	// read nonce size
 	var nsize byte
-	if nsize, err = br.ReadByte(); err != nil {
+	if nsize, err = r.ReadByte(); err != nil {
 		return h, err
 	}
 
 	// read nonce
 	h.nonce = make([]byte, nsize)
-	if _, err := br.Read(h.nonce); err != nil {
+	if _, err := r.Read(h.nonce); err != nil {
 		return h, err
 	}
 
 	// read chunk size
 	sizeChunk := make([]byte, binary.MaxVarintLen32)
-	if _, err = br.Read(sizeChunk); err != nil {
+	if _, err = r.Read(sizeChunk); err != nil {
 		return h, err
 	}
 	val, err := binary.ReadUvarint(bytes.NewReader(sizeChunk))
