@@ -44,7 +44,7 @@ func Encrypt(r io.Reader, w io.Writer, skey string, extra []byte) error {
 		var n int
 		var readErr error
 		var ct chunkType
-		if extra != nil && len(extra) > 0 {
+		if len(extra) > 0 {
 			// write the extra data first, but only once
 			n = copy(pbuf, extra)
 			ct = chunkTypeExtra
