@@ -54,7 +54,7 @@ func checkSchemeType(st schemeType) error {
 	switch st {
 	case schemeAES256GCM:
 	default:
-		err = fmt.Errorf("invalid scheme: %d", st)
+		err = fmt.Errorf("invalid scheme type: %d", st)
 	}
 	return err
 }
