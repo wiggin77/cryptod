@@ -20,14 +20,14 @@ func TestReadWriteChunkHeader(t *testing.T) {
 
 	// write header to buffer
 	buf := &bytes.Buffer{}
-	if err := writeChunkHeader(h, bufio.NewWriter(buf)); err != nil {
+	if err := writeChunkHeader(h, buf); err != nil {
 		t.Error("error on write: ", err)
 	}
 
 	// read header back from buffer
 	var h2 chunkHeader
 	var err error
-	if h2, err = readChunkHeader(bufio.NewReader(buf), ChunkSize); err != nil {
+	if h2, err = readChunkHeader(buf, ChunkSize); err != nil {
 		t.Error("error on read: ", err)
 	}
 
@@ -74,26 +74,24 @@ func makeChunkHeader() chunkHeader {
 }
 
 func TestWriteChunkHeaderNeg(t *testing.T) {
-	bw := bufio.NewWriter(bytes.NewBuffer(make([]byte, 100)))
+	w := &bytes.Buffer{}
 	ch := makeChunkHeader()
 	ch.ct = chunkType(0xDE)
-	if err := writeChunkHeader(ch, bw); !strings.Contains(err.Error(), "invalid chunk type") {
+	if err := writeChunkHeader(ch, w); !strings.Contains(err.Error(), "invalid chunk type") {
 		t.Error("expected invalid chunk type error")
 	}
 	ch = makeChunkHeader()
 	ch.st = schemeType(0xDE)
-	if err := writeChunkHeader(ch, bw); !strings.Contains(err.Error(), "invalid scheme type") {
+	if err := writeChunkHeader(ch, w); !strings.Contains(err.Error(), "invalid scheme type") {
 		t.Error("expected invalid scheme type error")
 	}
-	// generate io errors by passing size limited writer
+
+	// generate io error by passing size limited writer
+	const limit = 10
 	ch = makeChunkHeader()
-	limits := []int{1, 2}
-	for _, lim := range limits {
-		lw := NewLimitedWriter(&bytes.Buffer{}, lim)
-		bw = bufio.NewWriter(lw)
-		if err := writeChunkHeader(ch, bw); err == nil {
-			t.Errorf("expected error for limit %d", lim)
-		}
+	lw := NewLimitedWriter(&bytes.Buffer{}, limit)
+	if err := writeChunkHeader(ch, lw); err == nil {
+		t.Errorf("expected error for limit %d", limit)
 	}
 }
 
@@ -148,7 +146,7 @@ func (lw *LimitedWriter) Write(p []byte) (int, error) {
 		return 0, ErrWriterFull
 	}
 	avail := lw.limit - lw.written
-	if avail > len(p) {
+	if avail < len(p) {
 		var err error
 		var n int
 		if n, err = lw.w.Write(p[:avail]); err == nil {
