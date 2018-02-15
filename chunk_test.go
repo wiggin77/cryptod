@@ -34,6 +34,34 @@ func TestReadWriteChunkHeader(t *testing.T) {
 	}
 }
 
+func TestCheckChunkType(t *testing.T) {
+	inputs := []chunkType{chunkTypeData, chunkTypeExtra, chunkTypeTomb}
+	for _, ct := range inputs {
+		if err := checkChunkType(ct); err != nil {
+			t.Errorf("unexpected error for ct=%d: %v", ct, err)
+		}
+	}
+
+	ct := chunkType(0xDE)
+	if err := checkChunkType(ct); err == nil {
+		t.Errorf("expected error for ct=%d", ct)
+	}
+}
+
+func TestCheckSchemeType(t *testing.T) {
+	inputs := []schemeType{schemeAES256GCM}
+	for _, st := range inputs {
+		if err := checkSchemeType(st); err != nil {
+			t.Errorf("unexpected error for st=%d: %v", st, err)
+		}
+	}
+
+	st := schemeType(0xDE)
+	if err := checkSchemeType(st); err == nil {
+		t.Errorf("expected error for st=%d", st)
+	}
+}
+
 func TestReadChunkHeaderGibberish(t *testing.T) {
 	// create random input data
 	buf := make([]byte, ChunkSize*2)

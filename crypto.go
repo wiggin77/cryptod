@@ -59,7 +59,7 @@ func Encrypt(reader io.Reader, writer io.Writer, skey string, extra []byte) erro
 			readErr = nil
 			extra = nil
 		} else {
-			n, readErr = br.Read(pbuf)
+			n, readErr = io.ReadFull(br, pbuf)
 			ct = chunkTypeData
 		}
 		if n > 0 {
@@ -177,19 +177,19 @@ func readEncryptedChunk(rctx readCtx, ch chunkHeader) ([]byte, error) {
 		// read the encrypted chunk
 		var err error
 		cbuf := buf[:size]
-		n, err := rctx.br.Read(cbuf)
-		if err != nil && err != io.EOF {
-			return nil, err
+		n, err := io.ReadFull(rctx.br, cbuf)
+		if err != nil {
+			return buf, err
 		}
 		if n != size {
 			return buf, fmt.Errorf("wrong chunk size read, expected %d, got %d", size, n)
 		}
 		// decrypt the chunk
 		if pbuf, err = rctx.gcm.Open(cbuf[:0], ch.nonce, cbuf, nil); err != nil {
-			return nil, err
+			return buf, err
 		}
 	} else {
-		pbuf = buf[0:0]
+		pbuf = buf[:0]
 	}
 	return pbuf, nil
 }

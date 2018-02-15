@@ -8,7 +8,7 @@ import (
 )
 
 func TestEncryptDecrypt(t *testing.T) {
-	sizes := []int{0, 1, 10, 100, 1000, 1000 * 1024 * 100}
+	sizes := []int{0, 1, 10, 100, 1000, 1000 * 1024 * 4, 1000 * 1024 * 100}
 	const key = "secret key"
 	const extra = "Wake up, Neo..."
 

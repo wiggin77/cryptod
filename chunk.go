@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
 )
 
 type chunkType byte
@@ -107,7 +108,7 @@ func readChunkHeader(r *bufio.Reader, maxChunkSize int) (chunkHeader, error) {
 	// read the tag
 	taglen := len(chunkTag)
 	tag := make([]byte, taglen)
-	if _, err = r.Read(tag); err != nil {
+	if _, err = io.ReadFull(r, tag); err != nil {
 		return h, err
 	}
 	if bytes.Compare(tag, chunkTag) != 0 {
@@ -142,13 +143,13 @@ func readChunkHeader(r *bufio.Reader, maxChunkSize int) (chunkHeader, error) {
 
 	// read nonce
 	h.nonce = make([]byte, nsize)
-	if _, err := r.Read(h.nonce); err != nil {
+	if _, err := io.ReadFull(r, h.nonce); err != nil {
 		return h, err
 	}
 
 	// read chunk size
 	sizeChunk := make([]byte, binary.MaxVarintLen32)
-	if _, err = r.Read(sizeChunk); err != nil {
+	if _, err = io.ReadFull(r, sizeChunk); err != nil {
 		return h, err
 	}
 	val, err := binary.ReadUvarint(bytes.NewReader(sizeChunk))
