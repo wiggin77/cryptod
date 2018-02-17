@@ -127,3 +127,14 @@ func TestTamper(t *testing.T) {
 		t.Error("expected a decrypt error with tampered byte")
 	}
 }
+
+// getGCM returns a block cipher wrapped in GCM.
+func TestGetGCM(t *testing.T) {
+	if _, err := getGCM("secret", schemeAES256GCM); err != nil {
+		t.Error("unexpected error: ", err)
+	}
+
+	if _, err := getGCM("secret", schemeType(0xDE)); err == nil {
+		t.Error("expected error")
+	}
+}

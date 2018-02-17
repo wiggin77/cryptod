@@ -99,7 +99,7 @@ func TestWriteChunkHeaderNeg(t *testing.T) {
 func TestReadChunkHeaderNeg(t *testing.T) {
 	// read various amounts of the chunk header to trigger all the
 	// error cases.
-	limits := []int{1, 2, 3}
+	limits := []int{1, 2, 3, 4, 16, 18, 21}
 	for _, lim := range limits {
 		// stuff a chunk header into a buffer
 		buf := &bytes.Buffer{}
