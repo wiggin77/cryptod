@@ -4,11 +4,12 @@ import (
 	"bufio"
 	"bytes"
 	"crypto/rand"
-	"errors"
 	"fmt"
 	"io"
 	"strings"
 	"testing"
+
+	"github.com/wiggin77/cryptod/test"
 )
 
 func TestReadWriteChunkHeader(t *testing.T) {
@@ -89,9 +90,28 @@ func TestWriteChunkHeaderNeg(t *testing.T) {
 	// generate io error by passing size limited writer
 	const limit = 10
 	ch = makeChunkHeader()
-	lw := NewLimitedWriter(&bytes.Buffer{}, limit)
+	lw := test.NewLimitedWriter(&bytes.Buffer{}, limit)
 	if err := writeChunkHeader(ch, lw); err == nil {
 		t.Errorf("expected error for limit %d", limit)
+	}
+}
+
+func TestReadChunkHeaderNeg(t *testing.T) {
+	// read various amounts of the chunk header to trigger all the
+	// error cases.
+	limits := []int{1, 2, 3}
+	for _, lim := range limits {
+		// stuff a chunk header into a buffer
+		buf := &bytes.Buffer{}
+		ch := makeChunkHeader()
+		if err := writeChunkHeader(ch, buf); err != nil {
+			t.Error("unexpected error: ", err)
+		}
+		// read it back
+		lr := io.LimitReader(buf, int64(lim))
+		if _, err := readChunkHeader(lr, ChunkSize); err == nil {
+			t.Errorf("expected error for limit %d", lim)
+		}
 	}
 }
 
@@ -123,36 +143,4 @@ func compareChunkHeader(h1 chunkHeader, h2 chunkHeader) error {
 		return fmt.Errorf("mismatched size: got %v, expected %v", h2.dataSize, h1.dataSize)
 	}
 	return nil
-}
-
-// ErrWriterFull is returned by LimitedWriter when trying to writer beyond the limit.
-var ErrWriterFull = errors.New("writer full")
-
-// LimitedWriter provides an io.Writer that can
-type LimitedWriter struct {
-	limit   int
-	written int
-	w       io.Writer
-}
-
-// NewLimitedWriter returns a new NewLimitedWriter with the specified limit.
-func NewLimitedWriter(w io.Writer, limit int) *LimitedWriter {
-	return &LimitedWriter{limit: limit, w: w}
-}
-
-// Write writes the bytes, returning `ErrWriterFull` if the limit is exceeded.
-func (lw *LimitedWriter) Write(p []byte) (int, error) {
-	if lw.written >= lw.limit {
-		return 0, ErrWriterFull
-	}
-	avail := lw.limit - lw.written
-	if avail < len(p) {
-		var err error
-		var n int
-		if n, err = lw.w.Write(p[:avail]); err == nil {
-			err = ErrWriterFull
-		}
-		return n, err
-	}
-	return lw.w.Write(p)
 }

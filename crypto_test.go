@@ -5,6 +5,8 @@ import (
 	"crypto/rand"
 	"io"
 	"testing"
+
+	"github.com/wiggin77/cryptod/test"
 )
 
 func TestEncryptDecrypt(t *testing.T) {
@@ -14,7 +16,7 @@ func TestEncryptDecrypt(t *testing.T) {
 
 	// encrypt then decrypt and check results
 	for _, size := range sizes {
-		plaintext := generatePlainText(size)
+		plaintext := test.GeneratePlainText(size)
 
 		r := bytes.NewReader(plaintext)
 		buf := &bytes.Buffer{}
@@ -45,7 +47,7 @@ func TestTruncated(t *testing.T) {
 	const key = "secret key"
 
 	for _, size := range sizes {
-		plaintext := generatePlainText(size)
+		plaintext := test.GeneratePlainText(size)
 
 		r := bytes.NewReader(plaintext)
 		buf := &bytes.Buffer{}
@@ -86,7 +88,7 @@ func TestGibberish(t *testing.T) {
 func TestBadKey(t *testing.T) {
 	const key = "this is a secret"
 	const keybad = "this is a "
-	plaintext := generatePlainText(1000 * 1024 * 10)
+	plaintext := test.GeneratePlainText(1000 * 1024 * 10)
 
 	r := bytes.NewReader(plaintext)
 	buf := &bytes.Buffer{}
@@ -105,7 +107,7 @@ func TestBadKey(t *testing.T) {
 
 func TestTamper(t *testing.T) {
 	const key = "this is a secret"
-	plaintext := generatePlainText(1000 * 1024 * 10)
+	plaintext := test.GeneratePlainText(1000 * 1024 * 10)
 
 	r := bytes.NewReader(plaintext)
 	buf := &bytes.Buffer{}
@@ -124,16 +126,4 @@ func TestTamper(t *testing.T) {
 	if err == nil {
 		t.Error("expected a decrypt error with tampered byte")
 	}
-}
-
-// helper to generate predicable plaintext of any size
-func generatePlainText(size int) []byte {
-	const s = "0123456789"
-	src := []byte(s)
-	section := make([]byte, size)
-
-	for i := range section {
-		section[i] = src[i%len(s)]
-	}
-	return section
 }
