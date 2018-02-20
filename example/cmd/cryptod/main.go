@@ -7,6 +7,8 @@ import (
 	"os/user"
 	"path/filepath"
 	"strings"
+
+	"github.com/wiggin77/cryptod"
 )
 
 const usageMessage = "\n" +
@@ -15,7 +17,12 @@ const usageMessage = "\n" +
 	cryptod -e -in=plaintext.txt -out=crypttext.txt.aes -key=this_is_a_secret
  - decrypt a file:
 	cryptod -d -in=crypttext.txt.aes -out=plaintext.txt -key=this_is_a_secret
- note: spaces must be escaped
+	cryptod -d -in=crypttext.txt.aes -key=this_is_a_secret
+
+Notes:
+  - when decrypting, 'out' may be omitted and the original 
+    filename will be used
+  - spaces must be escaped
 `
 
 var (
@@ -31,7 +38,7 @@ func init() {
 	flag.BoolVar(&modeEncrypt, "e", false, "encryption mode")
 	flag.BoolVar(&modeDecrypt, "d", false, "decryption mode")
 	flag.StringVar(&fileIn, "in", "", "input file")
-	flag.StringVar(&fileOut, "out", "", "output file")
+	flag.StringVar(&fileOut, "out", "", "output file (optional when decrypting)")
 	flag.StringVar(&skey, "key", "", "secret key")
 	flag.BoolVar(&forceOverwrite, "f", false, "force overwrite of output file")
 }
@@ -43,40 +50,57 @@ func main() {
 	// need exactly one of `e` or `d`
 	if (modeEncrypt && modeDecrypt) || (!modeEncrypt && !modeDecrypt) {
 		printError("invalid mode")
-		flag.Usage()
+		handleError(nil, true)
 	}
 
+	// expand tilde to user's home dir, and make both paths absolute.
 	fileIn = expandTilde(fileIn)
 	fileOut = expandTilde(fileOut)
+	var err error
+	if fileIn, fileOut, err = cryptod.AbsPath(fileIn, fileOut); err != nil {
+		handleError(err, false)
+	}
 
 	// need an input file and it must exist
 	if _, err := os.Stat(fileIn); os.IsNotExist(err) {
 		printError("input file does not exist: ", fileIn)
-		flag.Usage()
+		handleError(nil, false)
 	}
 
 	// need a key
 	if skey == "" {
 		printError("missing secret key")
-		flag.Usage()
+		handleError(nil, false)
 	}
 
-	// output file can be infered
-	if fileOut == "" {
-		fileOut = inferOutputFile(modeEncrypt, fileIn)
+	// output file can be infered when encrypting
+	if len(fileOut) == 0 && modeEncrypt {
+		fileOut = fileIn + ".aes"
 	}
 
 	// output file should not exist (unless force overwrite flag is present)
-	if _, err := os.Stat(fileOut); err == nil && !forceOverwrite {
-		printError("output file exists without force overwrite: ", fileOut)
-		flag.Usage()
+	if len(fileOut) > 0 {
+		if _, err := os.Stat(fileOut); err == nil && !forceOverwrite {
+			printError("output file exists without force overwrite: ", fileOut)
+			handleError(nil, false)
+		}
 	}
 
-	err := cmd(modeEncrypt, fileIn, fileOut, skey)
+	err = cmd(modeEncrypt, fileIn, fileOut, skey)
 	if err != nil {
 		printError(err)
 		os.Exit(1)
 	}
+}
+
+func handleError(err error, showUsage bool) {
+	if err != nil {
+		printError(err)
+	}
+	if showUsage {
+		help()
+	}
+	os.Exit(2)
 }
 
 func help() {
@@ -89,21 +113,6 @@ func help() {
 func printError(a ...interface{}) {
 	fmt.Fprint(os.Stderr, "error -- ")
 	fmt.Fprintln(os.Stderr, a...)
-}
-
-// infers best fileOut name based on mode and fileIn
-func inferOutputFile(encrypt bool, fileIn string) string {
-	if encrypt {
-		return fileIn + ".aes"
-	}
-
-	// for decrypting, if file ends in aes then just strip the extension.
-	if strings.HasSuffix(fileIn, ".aes") {
-		return strings.TrimSuffix(fileIn, ".aes")
-	}
-
-	// just add plaintext extension
-	return fileIn + ".plain"
 }
 
 // expands a path beginning with "~/" to include user's home dir.

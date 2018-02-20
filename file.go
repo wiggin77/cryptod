@@ -1,11 +1,7 @@
 package cryptod
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"errors"
-	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 )
@@ -17,14 +13,15 @@ import (
 // of the block key + nonce could weaken the cipher.  A simple way of ensuring
 // this is to use a key comprised of concatenated secret and filespec.
 //
-// The file name of the input file is encrypted and stored in the output file,
-// and is returned when decrypting.
+// Extra data can be included, such as original filename or any other info, and
+// will be encrypted with the output file. The extra data will be returned when
+// decrypting.
 //
 // Uses AES256 encryption and GCM authentication on chunks of size up to 1MB.
-func EncryptFile(fileIn string, fileOut string, skey string) error {
+func EncryptFile(fileIn string, fileOut string, skey string, extra []byte) error {
 	var err error
 	// make paths absolute
-	if fileIn, fileOut, err = absPath(fileIn, fileOut); err != nil {
+	if fileIn, fileOut, err = AbsPath(fileIn, fileOut); err != nil {
 		return err
 	}
 
@@ -48,9 +45,7 @@ func EncryptFile(fileIn string, fileOut string, skey string) error {
 	}
 	defer fout.Close()
 
-	// need input filename to store in encrypted file
-	_, name := filepath.Split(fileIn)
-	if err = Encrypt(fin, fout, skey, []byte(name)); err != nil {
+	if err = Encrypt(fin, fout, skey, extra); err != nil {
 		fout.Close()
 		os.Remove(fileOut)
 		return err
@@ -59,58 +54,38 @@ func EncryptFile(fileIn string, fileOut string, skey string) error {
 }
 
 // DecryptFile decrypts a file and writes the plaintext contents to another file.
-// If `fileOut` is the empty string then the new plaintext file will use the original
-// filename stored in the encrypted input file.
-// The original filename is returned or any error that was encountered.
-func DecryptFile(fileIn string, fileOut string, skey string) (string, error) {
+// Any extra data encrypted with the file it returned.
+func DecryptFile(fileIn string, fileOut string, skey string) ([]byte, error) {
 	var err error
+	var extra []byte
 
 	// make paths absolute
-	if fileIn, fileOut, err = absPath(fileIn, fileOut); err != nil {
-		return "", err
+	if fileIn, fileOut, err = AbsPath(fileIn, fileOut); err != nil {
+		return extra, err
 	}
 
 	var fin *os.File
 	if fin, err = os.Open(fileIn); err != nil {
-		return "", err
+		return extra, err
 	}
 	defer fin.Close()
 
-	// use temp file name if `fileOut` is empty.
-	var bTempUsed bool
-	if len(fileOut) == 0 {
-		bTempUsed = true
-		fileOut = tempFilename(filepath.Dir(fileIn))
-	}
-
 	var fout *os.File
 	if fout, err = os.Create(fileOut); err != nil {
-		return "", err
+		return extra, err
 	}
 	defer fout.Close()
 
-	var name []byte
-	if name, err = Decrypt(fin, fout, skey); err != nil {
+	if extra, err = Decrypt(fin, fout, skey); err != nil {
 		fout.Close()
 		os.Remove(fileOut)
-		return "", err
+		return extra, err
 	}
-	if err = syncClose(fout); err != nil {
-		return "", err
-	}
-
-	if bTempUsed {
-		// rename output file to original
-		fname := string(name)
-		fname = filepath.Join(filepath.Dir(fileIn), fname)
-		fout.Close()
-		return fname, os.Remove(fileOut)
-	}
-	return string(name), nil
+	return extra, SyncClose(fout)
 }
 
-// absPath combines two calls to `filepath.Abs` into one.
-func absPath(a string, b string) (string, string, error) {
+// AbsPath combines two calls to `filepath.Abs` into one.
+func AbsPath(a string, b string) (string, string, error) {
 	var err error
 	if a, err = filepath.Abs(a); err != nil {
 		return a, b, err
@@ -121,8 +96,8 @@ func absPath(a string, b string) (string, string, error) {
 	return a, b, nil
 }
 
-// syncClose does an fsync and close on a file.
-func syncClose(f *os.File) error {
+// SyncClose does an fsync and close on a file.
+func SyncClose(f *os.File) error {
 	var s string
 	if err := f.Sync(); err != nil {
 		s += err.Error() + "; "
@@ -134,27 +109,4 @@ func syncClose(f *os.File) error {
 		return errors.New(s)
 	}
 	return nil
-}
-
-// tempFilename returns a filename that is unique
-// and unused in the `dir` directory at the time
-// this method is called.
-func tempFilename(dir string) string {
-	b := make([]byte, 8)
-	var fname string
-	var count int
-
-	for {
-		io.ReadFull(rand.Reader, b)
-		fname = "dal" + hex.EncodeToString(b)
-		fspec := filepath.Join(dir, fname)
-		if _, err := os.Stat(fspec); err == nil {
-			break
-		}
-		count++
-		if count > 1000 {
-			panic(fmt.Errorf("cannot create tmp filename in dir `%s`", dir))
-		}
-	}
-	return fname
 }

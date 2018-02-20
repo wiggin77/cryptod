@@ -10,7 +10,12 @@ Usage of 'cryptod'
 	cryptod -e -in=plaintext.txt -out=crypttext.txt.aes -key=this_is_a_secret
  - decrypt a file:
 	cryptod -d -in=crypttext.txt.aes -out=plaintext.txt -key=this_is_a_secret
- note: spaces must be escaped
+	cryptod -d -in=crypttext.txt.aes -key=this_is_a_secret
+
+Notes:
+  - when decrypting, 'out' may be omitted and the original 
+    filename will be used
+  - spaces must be escaped
 
 Flags:
   -d	decryption mode
@@ -21,5 +26,5 @@ Flags:
   -key string
     	secret key
   -out string
-    	output file
+    	output file (optional when decrypting)
 ```
