@@ -87,11 +87,15 @@ func DecryptFile(fileIn string, fileOut string, skey string) ([]byte, error) {
 // AbsPath combines two calls to `filepath.Abs` into one.
 func AbsPath(a string, b string) (string, string, error) {
 	var err error
-	if a, err = filepath.Abs(a); err != nil {
-		return a, b, err
+	if len(a) > 0 {
+		if a, err = filepath.Abs(a); err != nil {
+			return a, b, err
+		}
 	}
-	if b, err = filepath.Abs(b); err != nil {
-		return a, b, err
+	if len(b) > 0 {
+		if b, err = filepath.Abs(b); err != nil {
+			return a, b, err
+		}
 	}
 	return a, b, nil
 }
