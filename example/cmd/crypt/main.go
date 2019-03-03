@@ -10,11 +10,11 @@ import (
 )
 
 const usageMessage = "\n" +
-	`Usage of 'cryptod'
+	`Usage of 'crypt'
  - encrypt a file:
-	cryptod -e -in=plaintext.txt -out=crypttext.txt.aes -key=this_is_a_secret
+	crypt -e -in=plaintext.txt -out=crypttext.txt.aes -key=this_is_a_secret
  - decrypt a file:
-	cryptod -d -in=crypttext.txt.aes -out=plaintext.txt -key=this_is_a_secret
+	crypt -d -in=crypttext.txt.aes -out=plaintext.txt -key=this_is_a_secret
  note: spaces must be escaped
 `
 
