@@ -38,7 +38,7 @@ func TestEncryptDecrypt(t *testing.T) {
 
 	// encrypt it
 	defer os.Remove(fEncrypted)
-	cmd := exec.Command("/bin/sh", "cryptod", "-e", "-f", "-in="+fPlain, "-out="+fEncrypted, "-key="+key)
+	cmd := exec.Command("/bin/sh", "crypt", "-e", "-f", "-in="+fPlain, "-out="+fEncrypted, "-key="+key)
 	err = cmd.Run()
 	if err != nil {
 		t.Error("error encrypting: ", err)
@@ -47,7 +47,7 @@ func TestEncryptDecrypt(t *testing.T) {
 
 	// decrypt it
 	defer os.Remove(fDecrypted)
-	cmd = exec.Command("/bin/sh", "cryptod", "-d", "-f", "-in="+fEncrypted, "-out="+fDecrypted, "-key="+key)
+	cmd = exec.Command("/bin/sh", "crypt", "-d", "-f", "-in="+fEncrypted, "-out="+fDecrypted, "-key="+key)
 	err = cmd.Run()
 	if err != nil {
 		t.Error("error decrypting: ", err)
