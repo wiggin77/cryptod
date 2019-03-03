@@ -1,9 +1,11 @@
+# cryptod
+
 [![Build Status](https://travis-ci.org/wiggin77/cryptod.svg?branch=master)](https://travis-ci.org/wiggin77/cryptod)
 
-# cryptod
 AES256-GCM encryption and decryption of arbitrarily large sets of data for golang.
 
 ## Usage
+
 Detailed README coming soon.  
 
 In the meantime look here: [godoc](https://godoc.org/github.com/wiggin77/cryptod).
