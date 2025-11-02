@@ -64,12 +64,16 @@ func TestCLIKeyExposureInProcessList(t *testing.T) {
 	output, err := psCmd.Output()
 	if err != nil {
 		t.Logf("Warning: Could not run 'ps aux': %v", err)
-		cmd.Wait() // Clean up
+		if waitErr := cmd.Wait(); waitErr != nil {
+			t.Logf("Warning: Error waiting for command: %v", waitErr)
+		}
 		return
 	}
 
 	// Wait for encryption to complete
-	cmd.Wait()
+	if err := cmd.Wait(); err != nil {
+		t.Logf("Warning: Command failed: %v", err)
+	}
 
 	// Check if the secret key appears in process list
 	outputStr := string(output)

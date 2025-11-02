@@ -1,0 +1,687 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>cryptod: Go Coverage Report</title>
+		<style>
+			body {
+				background: black;
+				color: rgb(80, 80, 80);
+			}
+			body, pre, #legend span {
+				font-family: Menlo, monospace;
+				font-weight: bold;
+			}
+			#topbar {
+				background: black;
+				position: fixed;
+				top: 0; left: 0; right: 0;
+				height: 42px;
+				border-bottom: 1px solid rgb(80, 80, 80);
+			}
+			#content {
+				margin-top: 50px;
+			}
+			#nav, #legend {
+				float: left;
+				margin-left: 10px;
+			}
+			#legend {
+				margin-top: 12px;
+			}
+			#nav {
+				margin-top: 10px;
+			}
+			#legend span {
+				margin: 0 5px;
+			}
+			.cov0 { color: rgb(192, 0, 0) }
+.cov1 { color: rgb(128, 128, 128) }
+.cov2 { color: rgb(116, 140, 131) }
+.cov3 { color: rgb(104, 152, 134) }
+.cov4 { color: rgb(92, 164, 137) }
+.cov5 { color: rgb(80, 176, 140) }
+.cov6 { color: rgb(68, 188, 143) }
+.cov7 { color: rgb(56, 200, 146) }
+.cov8 { color: rgb(44, 212, 149) }
+.cov9 { color: rgb(32, 224, 152) }
+.cov10 { color: rgb(20, 236, 155) }
+
+		</style>
+	</head>
+	<body>
+		<div id="topbar">
+			<div id="nav">
+				<select id="files">
+				
+				<option value="file0">github.com/wiggin77/cryptod/chunk.go (75.4%)</option>
+				
+				<option value="file1">github.com/wiggin77/cryptod/crypto.go (84.2%)</option>
+				
+				<option value="file2">github.com/wiggin77/cryptod/example/cmd/crypt/cmd.go (0.0%)</option>
+				
+				<option value="file3">github.com/wiggin77/cryptod/example/cmd/crypt/main.go (11.1%)</option>
+				
+				<option value="file4">github.com/wiggin77/cryptod/header.go (83.3%)</option>
+				
+				</select>
+			</div>
+			<div id="legend">
+				<span>not tracked</span>
+			
+				<span class="cov0">not covered</span>
+				<span class="cov8">covered</span>
+			
+			</div>
+		</div>
+		<div id="content">
+		
+		<pre class="file" id="file0" style="display: none">package cryptod
+
+import (
+        "bytes"
+        "encoding/binary"
+        "errors"
+        "fmt"
+        "io"
+)
+
+const (
+        chunkTag      = "ct"
+        chunkTypeData = "d"
+        chunkTypeTomb = "t"
+)
+
+type chunkHeader struct {
+        nonce []byte
+        size  uint32
+        tomb  bool
+}
+
+// writes a chunk header, containing the tag id, nonce and chunk size
+func writeChunkHeader(ch chunkHeader, w io.Writer) error <span class="cov8" title="1">{
+        // write the tag (open)
+        tag := []byte(chunkTag)
+        if _, err := w.Write(tag); err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        // write the chunk type
+        <span class="cov8" title="1">var t []byte
+        if ch.tomb </span><span class="cov8" title="1">{
+                t = []byte(chunkTypeTomb)
+        }</span> else<span class="cov8" title="1"> {
+                t = []byte(chunkTypeData)
+        }</span>
+        <span class="cov8" title="1">if _, err := w.Write(t); err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        // write the nonce size, followed by nonce
+        <span class="cov8" title="1">sizeNonce := make([]byte, binary.MaxVarintLen16)
+        binary.PutUvarint(sizeNonce, uint64(len(ch.nonce)))
+        if _, err := w.Write(sizeNonce); err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+        <span class="cov8" title="1">if _, err := w.Write(ch.nonce); err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        // write the chunk size
+        <span class="cov8" title="1">sizeChunk := make([]byte, binary.MaxVarintLen32)
+        binary.PutUvarint(sizeChunk, uint64(ch.size))
+        if _, err := w.Write(sizeChunk); err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        // write the tag (close)
+        <span class="cov8" title="1">if _, err := w.Write(tag); err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+        <span class="cov8" title="1">return nil</span>
+}
+
+// reads a chunk header
+func readChunkHeader(r io.Reader, maxChunkSize int) (chunkHeader, error) <span class="cov8" title="1">{
+        h := chunkHeader{}
+
+        // read the tag (open)
+        taglen := len(chunkTag)
+        tag := make([]byte, taglen)
+        if _, err := r.Read(tag); err != nil </span><span class="cov0" title="0">{
+                return h, err
+        }</span>
+        <span class="cov8" title="1">if !bytes.Equal(tag, []byte(chunkTag)) </span><span class="cov8" title="1">{
+                return h, errors.New("invalid chunk header tag (open)")
+        }</span>
+
+        // read the chunk type
+        <span class="cov8" title="1">t := []byte(chunkTypeData)
+        if _, err := r.Read(t); err != nil </span><span class="cov0" title="0">{
+                return h, err
+        }</span>
+        <span class="cov8" title="1">if bytes.Equal(t, []byte(chunkTypeTomb)) </span><span class="cov8" title="1">{
+                h.tomb = true
+        }</span>
+
+        // read nonce size
+        <span class="cov8" title="1">sizeNonce := make([]byte, binary.MaxVarintLen16)
+        if _, err := r.Read(sizeNonce); err != nil </span><span class="cov0" title="0">{
+                return h, err
+        }</span>
+        <span class="cov8" title="1">val, err := binary.ReadUvarint(bytes.NewReader(sizeNonce))
+        if err != nil </span><span class="cov0" title="0">{
+                return h, err
+        }</span>
+        <span class="cov8" title="1">size := uint32(val)
+        if size &gt; 128 </span><span class="cov8" title="1">{ // sanity check
+                return h, fmt.Errorf("invalid nonce size: %d", size)
+        }</span>
+
+        // read nonce
+        <span class="cov8" title="1">h.nonce = make([]byte, size)
+        if _, err := r.Read(h.nonce); err != nil </span><span class="cov8" title="1">{
+                return h, err
+        }</span>
+
+        // read chunk size
+        <span class="cov8" title="1">sizeChunk := make([]byte, binary.MaxVarintLen32)
+        if _, err := r.Read(sizeChunk); err != nil </span><span class="cov0" title="0">{
+                return h, err
+        }</span>
+        <span class="cov8" title="1">val, err = binary.ReadUvarint(bytes.NewReader(sizeChunk))
+        if err != nil </span><span class="cov0" title="0">{
+                return h, err
+        }</span>
+        <span class="cov8" title="1">h.size = uint32(val)
+        if h.size &gt; uint32(maxChunkSize) </span><span class="cov0" title="0">{
+                return h, fmt.Errorf("invalid chunk size: %d, max=%d", h.size, maxChunkSize)
+        }</span>
+
+        // read the tag (close)
+        <span class="cov8" title="1">tag = make([]byte, taglen)
+        if _, err := r.Read(tag); err != nil </span><span class="cov0" title="0">{
+                return h, err
+        }</span>
+        <span class="cov8" title="1">if !bytes.Equal(tag, []byte(chunkTag)) </span><span class="cov0" title="0">{
+                return h, errors.New("invalid chunk header tag (close)")
+        }</span>
+        // header ok
+        <span class="cov8" title="1">return h, nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file1" style="display: none">package cryptod
+
+import (
+        "crypto/aes"
+        "crypto/cipher"
+        "crypto/rand"
+        "crypto/sha512"
+        "encoding/binary"
+        "fmt"
+        "io"
+)
+
+const (
+        chunkSize = 1024 * 1000
+)
+
+// Encrypt reads chunks of data from `r` writes the encrypted contents to `w`
+// based on the specified key. Reading continues until io.EOF.
+//
+// The key should be unique for each io.Reader instance.
+// For example, when encrypting files `skey` can be a secret plus the filespec
+// to ensure the key is unique for each file.
+//
+// Uses AES256 encryption and GCM authentication on chunks of size up to 1MB.
+func Encrypt(r io.Reader, w io.Writer, skey string) error <span class="cov8" title="1">{
+        gcm, err := getGCM(skey)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        // reuse buffers to reduce GC
+        <span class="cov8" title="1">pbuf := make([]byte, chunkSize)
+        nonce := make([]byte, gcm.NonceSize())
+        cbuf := make([]byte, len(pbuf)+gcm.Overhead())
+        var ctr uint32 = 1
+
+        // write the stream header
+        if err = writeHeader(w); err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov8" title="1">for </span><span class="cov8" title="1">{
+                n, readErr := r.Read(pbuf)
+                if n &gt; 0 </span><span class="cov8" title="1">{
+                        p := pbuf[:n]
+                        // randomize the nonce
+                        if _, err := io.ReadFull(rand.Reader, nonce[binary.MaxVarintLen32:]); err != nil </span><span class="cov0" title="0">{
+                                return err
+                        }</span>
+                        <span class="cov8" title="1">binary.PutUvarint(nonce, uint64(ctr))
+                        // create AAD with chunk counter to authenticate chunk sequence
+                        aad := make([]byte, 4)
+                        binary.LittleEndian.PutUint32(aad, ctr)
+                        ctr++
+                        // encrypt and authenticate with AAD binding chunk counter
+                        c := gcm.Seal(cbuf[:0], nonce, p, aad)
+                        var clen = uint32(len(c))
+                        if clen &gt; 0 </span><span class="cov8" title="1">{
+                                // write a chunk header containing actual encrypted block size
+                                if err := writeChunkHeader(chunkHeader{nonce: nonce, size: clen}, w); err != nil </span><span class="cov0" title="0">{
+                                        return err
+                                }</span>
+                                // write encrypted data to output steam
+                                <span class="cov8" title="1">if _, err := w.Write(c); err != nil </span><span class="cov0" title="0">{
+                                        return err
+                                }</span>
+                        }
+                }
+
+                <span class="cov8" title="1">if readErr == io.EOF </span><span class="cov8" title="1">{
+                        break</span>
+                }
+        }
+        // write the tomb chunk header
+        <span class="cov8" title="1">if _, err := io.ReadFull(rand.Reader, nonce); err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+        <span class="cov8" title="1">return writeChunkHeader(chunkHeader{nonce: nonce, size: 0, tomb: true}, w)</span>
+}
+
+// Decrypt reads chunks of data from `r` and writes the decrypted
+// chunks to `w` using the specified key. Reading continues until io.EOF.
+func Decrypt(r io.Reader, w io.Writer, skey string) error <span class="cov8" title="1">{
+        gcm, err := getGCM(skey)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov8" title="1">maxChunkSize := chunkSize + gcm.Overhead()
+        maxChunkSizeSanity := maxChunkSize * 2
+
+        // reuse buffers to reduce GC
+        buf := make([]byte, maxChunkSize)
+        var ctr uint32 = 1 // track expected chunk counter
+
+        // read and validate the header
+        h := header{}
+        if err := h.read(r); err != nil </span><span class="cov8" title="1">{
+                return err
+        }</span>
+
+        <span class="cov8" title="1">for </span><span class="cov8" title="1">{
+                // read next chunk header
+                var ch chunkHeader
+                ch, err = readChunkHeader(r, maxChunkSizeSanity)
+                if err != nil &amp;&amp; !ch.tomb </span><span class="cov8" title="1">{
+                        return err
+                }</span>
+                <span class="cov8" title="1">if ch.tomb </span><span class="cov8" title="1">{
+                        break</span> // tomb chunk header means we're done
+                }
+                // ensure cbuf is big enough
+                <span class="cov8" title="1">if cap(buf) &lt; int(ch.size) </span><span class="cov0" title="0">{
+                        buf = make([]byte, ch.size)
+                }</span>
+                // read the encrypted chunk
+                <span class="cov8" title="1">cbuf := buf[:ch.size]
+                n, readErr := r.Read(cbuf)
+                if readErr != nil &amp;&amp; readErr != io.EOF </span><span class="cov0" title="0">{
+                        return readErr
+                }</span>
+                <span class="cov8" title="1">if n != int(ch.size) </span><span class="cov8" title="1">{
+                        return fmt.Errorf("wrong chunk size read, expected %d, got %d", ch.size, n)
+                }</span>
+                // decrypt the chunk with AAD verification
+                <span class="cov8" title="1">aad := make([]byte, 4)
+                binary.LittleEndian.PutUint32(aad, ctr)
+                ctr++
+                var pbuf []byte
+                if pbuf, err = gcm.Open(cbuf[:0], ch.nonce, cbuf, aad); err != nil </span><span class="cov8" title="1">{
+                        return err
+                }</span>
+                // write plaintext to w
+                <span class="cov8" title="1">if _, err := w.Write(pbuf); err != nil </span><span class="cov0" title="0">{
+                        return err
+                }</span>
+        }
+        <span class="cov8" title="1">return nil</span>
+}
+
+// getGCM returns a AES256 block cipher wrapped in GCM.
+func getGCM(skey string) (cipher.AEAD, error) <span class="cov8" title="1">{
+        // key must be hashed to 32 bytes for AES256
+        key := sha512.Sum512_256([]byte(skey))
+
+        block, err := aes.NewCipher(key[:])
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+        <span class="cov8" title="1">gcm, err := cipher.NewGCM(block)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+        <span class="cov8" title="1">return gcm, nil</span>
+}
+
+// writes a file header
+func writeHeader(w io.Writer) error <span class="cov8" title="1">{
+        h := header{}
+        h.init()
+        return h.write(w)
+}</span>
+</pre>
+		
+		<pre class="file" id="file2" style="display: none">package main
+
+import (
+        "fmt"
+        "os"
+
+        "github.com/wiggin77/cryptod"
+)
+
+// cmd encrypts or decrypts a file
+func cmd(encrypt bool, fileIn string, fileOut string, skey string) error <span class="cov0" title="0">{
+
+        r, err := os.Open(fileIn)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+        <span class="cov0" title="0">defer func() </span><span class="cov0" title="0">{
+                if closeErr := r.Close(); closeErr != nil </span><span class="cov0" title="0">{
+                        fmt.Fprintf(os.Stderr, "warning: error closing input file: %v\n", closeErr)
+                }</span>
+        }()
+
+        // get the mode so it can be applied to the output file.
+        <span class="cov0" title="0">fi, err := r.Stat()
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+        <span class="cov0" title="0">fmode := fi.Mode()
+
+        // create output file, overwriting if it exists
+        w, err := os.Create(fileOut)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+        <span class="cov0" title="0">defer func() </span><span class="cov0" title="0">{
+                if closeErr := w.Close(); closeErr != nil </span><span class="cov0" title="0">{
+                        fmt.Fprintf(os.Stderr, "warning: error closing output file: %v\n", closeErr)
+                }</span>
+        }()
+
+        // copy fileIn mode to output file
+        <span class="cov0" title="0">if err := w.Chmod(fmode); err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov0" title="0">if encrypt </span><span class="cov0" title="0">{
+                err = cryptod.Encrypt(r, w, skey)
+        }</span> else<span class="cov0" title="0"> {
+                err = cryptod.Decrypt(r, w, skey)
+        }</span>
+
+        <span class="cov0" title="0">if err != nil </span><span class="cov0" title="0">{
+                if closeErr := w.Close(); closeErr != nil </span><span class="cov0" title="0">{
+                        fmt.Fprintf(os.Stderr, "warning: error closing output file during cleanup: %v\n", closeErr)
+                }</span>
+                <span class="cov0" title="0">if removeErr := os.Remove(fileOut); removeErr != nil </span><span class="cov0" title="0">{
+                        fmt.Fprintf(os.Stderr, "warning: error removing output file during cleanup: %v\n", removeErr)
+                }</span>
+        }
+        <span class="cov0" title="0">return err</span>
+}
+</pre>
+		
+		<pre class="file" id="file3" style="display: none">package main
+
+import (
+        "flag"
+        "fmt"
+        "os"
+        "os/user"
+        "path/filepath"
+        "strings"
+)
+
+const usageMessage = "\n" +
+        `Usage of 'crypt'
+ - encrypt a file:
+        CRYPTOD_KEY=this_is_a_secret crypt -e -in=plaintext.txt -out=crypttext.txt.aes
+ - decrypt a file:
+        CRYPTOD_KEY=this_is_a_secret crypt -d -in=crypttext.txt.aes -out=plaintext.txt
+
+ The encryption key must be provided via the CRYPTOD_KEY environment variable.
+ WARNING: Never pass keys as command-line arguments - they will be visible in
+ process lists and shell history!
+`
+
+var (
+        modeEncrypt    bool
+        modeDecrypt    bool
+        fileIn         string
+        fileOut        string
+        forceOverwrite bool
+)
+
+func init() <span class="cov8" title="1">{
+        flag.BoolVar(&amp;modeEncrypt, "e", false, "encryption mode")
+        flag.BoolVar(&amp;modeDecrypt, "d", false, "decryption mode")
+        flag.StringVar(&amp;fileIn, "in", "", "input file")
+        flag.StringVar(&amp;fileOut, "out", "", "output file")
+        flag.BoolVar(&amp;forceOverwrite, "f", false, "force overwrite of output file")
+}</span>
+
+func main() <span class="cov0" title="0">{
+        flag.Usage = help
+        flag.Parse()
+
+        // need exactly one of `e` or `d`
+        if (modeEncrypt &amp;&amp; modeDecrypt) || (!modeEncrypt &amp;&amp; !modeDecrypt) </span><span class="cov0" title="0">{
+                printError("invalid mode")
+                flag.Usage()
+        }</span>
+
+        <span class="cov0" title="0">fileIn = expandTilde(fileIn)
+        fileOut = expandTilde(fileOut)
+
+        // need an input file and it must exist
+        if _, err := os.Stat(fileIn); os.IsNotExist(err) </span><span class="cov0" title="0">{
+                printError("input file does not exist: ", fileIn)
+                flag.Usage()
+        }</span>
+
+        // get key from environment variable
+        <span class="cov0" title="0">skey := os.Getenv("CRYPTOD_KEY")
+        if skey == "" </span><span class="cov0" title="0">{
+                printError("missing secret key - set CRYPTOD_KEY environment variable")
+                flag.Usage()
+        }</span>
+
+        // output file can be infered
+        <span class="cov0" title="0">if fileOut == "" </span><span class="cov0" title="0">{
+                fileOut = inferOutputFile(modeEncrypt, fileIn)
+        }</span>
+
+        // output file should not exist (unless force overwrite flag is present)
+        <span class="cov0" title="0">if _, err := os.Stat(fileOut); err == nil &amp;&amp; !forceOverwrite </span><span class="cov0" title="0">{
+                printError("output file exists without force overwrite: ", fileOut)
+                flag.Usage()
+        }</span>
+
+        <span class="cov0" title="0">err := cmd(modeEncrypt, fileIn, fileOut, skey)
+        if err != nil </span><span class="cov0" title="0">{
+                printError(err)
+                os.Exit(1)
+        }</span>
+}
+
+func help() <span class="cov0" title="0">{
+        fmt.Fprint(os.Stderr, usageMessage)
+        fmt.Fprintln(os.Stderr, "Flags:")
+        flag.PrintDefaults()
+        os.Exit(2)
+}</span>
+
+func printError(a ...interface{}) <span class="cov0" title="0">{
+        fmt.Fprint(os.Stderr, "error -- ")
+        fmt.Fprintln(os.Stderr, a...)
+}</span>
+
+// infers best fileOut name based on mode and fileIn
+func inferOutputFile(encrypt bool, fileIn string) string <span class="cov0" title="0">{
+        if encrypt </span><span class="cov0" title="0">{
+                return fileIn + ".aes"
+        }</span>
+
+        // for decrypting, if file ends in aes then just strip the extension.
+        <span class="cov0" title="0">if strings.HasSuffix(fileIn, ".aes") </span><span class="cov0" title="0">{
+                return strings.TrimSuffix(fileIn, ".aes")
+        }</span>
+
+        // just add plaintext extension
+        <span class="cov0" title="0">return fileIn + ".plain"</span>
+}
+
+// expands a path beginning with "~/" to include user's home dir.
+func expandTilde(file string) string <span class="cov0" title="0">{
+        if !strings.HasPrefix(file, "~/") </span><span class="cov0" title="0">{
+                return file
+        }</span>
+
+        <span class="cov0" title="0">usr, err := user.Current()
+        if err != nil </span><span class="cov0" title="0">{
+                return file
+        }</span>
+        <span class="cov0" title="0">return filepath.Join(usr.HomeDir, file[2:])</span>
+}
+</pre>
+		
+		<pre class="file" id="file4" style="display: none">package cryptod
+
+import (
+        "bytes"
+        "fmt"
+        "io"
+)
+
+const (
+        magicSize  = 2
+        schemeSize = 9
+        verMajSize = 1
+        verMinSize = 1
+        headerSize = magicSize + schemeSize + verMajSize + verMinSize
+
+        magic  = "sc"
+        scheme = "aes256gcm"
+        verMaj = byte(1)
+        verMin = byte(0)
+)
+
+// header for encrypted files
+// (allows for versioning and changing the encryption scheme later)
+type header struct {
+        size   [1]byte // size in bytes of the other fields
+        magic  [magicSize]byte
+        scheme [schemeSize]byte
+        verMaj [verMajSize]byte
+        verMin [verMinSize]byte
+}
+
+// initializes the header with valid values
+func (h *header) init() <span class="cov8" title="1">{
+        h.size[0] = headerSize
+        copy(h.magic[:], magic)
+        copy(h.scheme[:], scheme)
+        h.verMaj[0] = verMaj
+        h.verMin[0] = verMin
+}</span>
+
+// validates the contents of header
+func (h *header) validate() error <span class="cov8" title="1">{
+        if !bytes.Equal(h.size[:], []byte{headerSize}) </span><span class="cov8" title="1">{
+                return fmt.Errorf("expected header size %d, got %v", headerSize, h.size)
+        }</span>
+
+        <span class="cov8" title="1">if !bytes.Equal(h.magic[:], []byte(magic)) </span><span class="cov0" title="0">{
+                return fmt.Errorf("expected magic %s, got %v", magic, h.magic)
+        }</span>
+
+        <span class="cov8" title="1">if !bytes.Equal(h.scheme[:], []byte(scheme)) </span><span class="cov0" title="0">{
+                return fmt.Errorf("expected scheme %s, got %v", scheme, h.scheme)
+        }</span>
+
+        <span class="cov8" title="1">if !bytes.Equal(h.verMaj[:], []byte{verMaj}) </span><span class="cov0" title="0">{
+                return fmt.Errorf("expected verMaj %d, got %v", verMaj, h.verMaj)
+        }</span>
+
+        <span class="cov8" title="1">if !bytes.Equal(h.verMin[:], []byte{verMin}) </span><span class="cov0" title="0">{
+                return fmt.Errorf("expected verMin %d, got %v", verMin, h.verMin)
+        }</span>
+        <span class="cov8" title="1">return nil</span>
+}
+
+// writes the header to `w`
+func (h *header) write(w io.Writer) error <span class="cov8" title="1">{
+        var err error
+        fields := [][]byte{h.size[:], h.magic[:], h.scheme[:], h.verMaj[:], h.verMin[:]}
+        for _, f := range fields </span><span class="cov8" title="1">{
+                if _, err = w.Write(f); err != nil </span><span class="cov8" title="1">{
+                        return err
+                }</span>
+        }
+        <span class="cov8" title="1">return nil</span>
+}
+
+// reads a header from `r`
+func (h *header) read(r io.Reader) error <span class="cov8" title="1">{
+        fields := [][]byte{h.size[:], h.magic[:], h.scheme[:], h.verMaj[:], h.verMin[:]}
+        for _, f := range fields </span><span class="cov8" title="1">{
+                n, err := r.Read(f)
+                if n != len(f) </span><span class="cov8" title="1">{
+                        return fmt.Errorf("wrong number of byte read, expected %d, got %d", len(f), n)
+                }</span>
+                <span class="cov8" title="1">if err != nil &amp;&amp; err != io.EOF </span><span class="cov0" title="0">{
+                        return err
+                }</span>
+        }
+        <span class="cov8" title="1">return h.validate()</span>
+}
+</pre>
+		
+		</div>
+	</body>
+	<script>
+	(function() {
+		var files = document.getElementById('files');
+		var visible;
+		files.addEventListener('change', onChange, false);
+		function select(part) {
+			if (visible)
+				visible.style.display = 'none';
+			visible = document.getElementById(part);
+			if (!visible)
+				return;
+			files.value = part;
+			visible.style.display = 'block';
+			location.hash = part;
+		}
+		function onChange() {
+			select(files.value);
+			window.scrollTo(0, 0);
+		}
+		if (location.hash != "") {
+			select(location.hash.substr(1));
+		}
+		if (!visible) {
+			select("file0");
+		}
+	})();
+	</script>
+</html>

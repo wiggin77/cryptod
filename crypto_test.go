@@ -29,7 +29,7 @@ func TestEncryptDecrypt(t *testing.T) {
 			break
 		}
 
-		if bytes.Compare(plaintext, pbuf.Bytes()) != 0 {
+		if !bytes.Equal(plaintext, pbuf.Bytes()) {
 			t.Errorf("compare failed for size %d, bytes differ", size)
 			break
 		}
@@ -151,7 +151,7 @@ func TestChunkBoundaries(t *testing.T) {
 			continue
 		}
 
-		if bytes.Compare(plaintext, pbuf.Bytes()) != 0 {
+		if !bytes.Equal(plaintext, pbuf.Bytes()) {
 			t.Errorf("compare failed for size %d, bytes differ", size)
 		}
 	}
@@ -183,7 +183,7 @@ func TestMultipleChunks(t *testing.T) {
 		return
 	}
 
-	if bytes.Compare(plaintext, pbuf.Bytes()) != 0 {
+	if !bytes.Equal(plaintext, pbuf.Bytes()) {
 		t.Error("decrypted data does not match original")
 	}
 

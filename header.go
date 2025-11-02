@@ -40,23 +40,23 @@ func (h *header) init() {
 
 // validates the contents of header
 func (h *header) validate() error {
-	if bytes.Compare(h.size[:], []byte{headerSize}) != 0 {
+	if !bytes.Equal(h.size[:], []byte{headerSize}) {
 		return fmt.Errorf("expected header size %d, got %v", headerSize, h.size)
 	}
 
-	if bytes.Compare(h.magic[:], []byte(magic)) != 0 {
+	if !bytes.Equal(h.magic[:], []byte(magic)) {
 		return fmt.Errorf("expected magic %s, got %v", magic, h.magic)
 	}
 
-	if bytes.Compare(h.scheme[:], []byte(scheme)) != 0 {
+	if !bytes.Equal(h.scheme[:], []byte(scheme)) {
 		return fmt.Errorf("expected scheme %s, got %v", scheme, h.scheme)
 	}
 
-	if bytes.Compare(h.verMaj[:], []byte{verMaj}) != 0 {
+	if !bytes.Equal(h.verMaj[:], []byte{verMaj}) {
 		return fmt.Errorf("expected verMaj %d, got %v", verMaj, h.verMaj)
 	}
 
-	if bytes.Compare(h.verMin[:], []byte{verMin}) != 0 {
+	if !bytes.Equal(h.verMin[:], []byte{verMin}) {
 		return fmt.Errorf("expected verMin %d, got %v", verMin, h.verMin)
 	}
 	return nil

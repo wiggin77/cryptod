@@ -75,7 +75,7 @@ func TestTombChunkHeader(t *testing.T) {
 		t.Errorf("tomb chunk should have size 0, got %d", h2.size)
 	}
 
-	if bytes.Compare(h.nonce, h2.nonce) != 0 {
+	if !bytes.Equal(h.nonce, h2.nonce) {
 		t.Error("nonce mismatch in tomb chunk")
 	}
 }
@@ -134,7 +134,7 @@ func TestChunkHeaderInvalidNonceSize(t *testing.T) {
 }
 
 func compareChunkHeader(h1 chunkHeader, h2 chunkHeader) error {
-	if bytes.Compare(h1.nonce, h2.nonce) != 0 {
+	if !bytes.Equal(h1.nonce, h2.nonce) {
 		return fmt.Errorf("mismatched nonce: got %v, expected %v", h2.nonce, h1.nonce)
 	}
 	if h1.size != h2.size {

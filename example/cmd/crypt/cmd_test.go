@@ -35,11 +35,16 @@ func TestEncryptDecrypt(t *testing.T) {
 	w.Close()
 
 	wdir, err := os.Getwd()
+	if err != nil {
+		t.Error("cannot get working directory: ", err)
+		return
+	}
 	fmt.Println("working dir: ", wdir)
 
 	// encrypt it
 	defer os.Remove(fEncrypted)
-	cmd := exec.Command("/bin/sh", "crypt", "-e", "-f", "-in="+fPlain, "-out="+fEncrypted, "-key="+key)
+	cmd := exec.Command("./crypt", "-e", "-f", "-in="+fPlain, "-out="+fEncrypted)
+	cmd.Env = append(os.Environ(), "CRYPTOD_KEY="+key)
 	err = cmd.Run()
 	if err != nil {
 		t.Error("error encrypting: ", err)
@@ -48,7 +53,8 @@ func TestEncryptDecrypt(t *testing.T) {
 
 	// decrypt it
 	defer os.Remove(fDecrypted)
-	cmd = exec.Command("/bin/sh", "crypt", "-d", "-f", "-in="+fEncrypted, "-out="+fDecrypted, "-key="+key)
+	cmd = exec.Command("./crypt", "-d", "-f", "-in="+fEncrypted, "-out="+fDecrypted)
+	cmd.Env = append(os.Environ(), "CRYPTOD_KEY="+key)
 	err = cmd.Run()
 	if err != nil {
 		t.Error("error decrypting: ", err)
