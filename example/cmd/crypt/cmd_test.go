@@ -19,6 +19,22 @@ const (
 )
 
 func TestEncryptDecrypt(t *testing.T) {
+	wdir, err := os.Getwd()
+	if err != nil {
+		t.Error("cannot get working directory: ", err)
+		return
+	}
+	fmt.Println("working dir: ", wdir)
+
+	// Build the crypt binary first
+	buildCmd := exec.Command("go", "build", "-o", "crypt", ".")
+	buildCmd.Dir = wdir
+	if output, err := buildCmd.CombinedOutput(); err != nil {
+		t.Errorf("cannot build crypt binary: %v\nOutput: %s", err, output)
+		return
+	}
+	defer os.Remove("crypt") // Clean up the binary after the test
+
 	// create plaintext file.
 	pbuf := generatePlainText(1024 * 1000 * 2)
 	w, err := os.Create(fPlain)
@@ -33,13 +49,6 @@ func TestEncryptDecrypt(t *testing.T) {
 		return
 	}
 	w.Close()
-
-	wdir, err := os.Getwd()
-	if err != nil {
-		t.Error("cannot get working directory: ", err)
-		return
-	}
-	fmt.Println("working dir: ", wdir)
 
 	// encrypt it
 	defer os.Remove(fEncrypted)
