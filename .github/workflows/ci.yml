@@ -1,0 +1,121 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+      - main
+  pull_request:
+    branches:
+      - master
+      - main
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Display Go version
+        run: go version
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Run tests
+        run: make test
+
+      - name: Run tests with race detector
+        run: make test-race
+
+  security-tests:
+    name: Security Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Run security tests
+        run: make test-security
+
+  code-quality:
+    name: Code Quality
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Check formatting
+        run: make check-fmt
+
+      - name: Run go vet
+        run: make vet
+
+      - name: Run linter
+        run: make lint
+
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Generate coverage report
+        run: make test-cover
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.out
+          flags: unittests
+          fail_ci_if_error: false
+
+  build-cli:
+    name: Build CLI
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Build CLI
+        run: make build-cli
+
+      - name: Test CLI binary
+        run: |
+          echo "test data" > /tmp/test.txt
+          CRYPTOD_KEY="test_key" ./example/cmd/crypt/crypt -e -in=/tmp/test.txt -out=/tmp/test.aes
+          CRYPTOD_KEY="test_key" ./example/cmd/crypt/crypt -d -in=/tmp/test.aes -out=/tmp/test_decrypt.txt
+          diff /tmp/test.txt /tmp/test_decrypt.txt

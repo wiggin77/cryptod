@@ -12,10 +12,13 @@ import (
 const usageMessage = "\n" +
 	`Usage of 'crypt'
  - encrypt a file:
-	crypt -e -in=plaintext.txt -out=crypttext.txt.aes -key=this_is_a_secret
+	CRYPTOD_KEY=this_is_a_secret crypt -e -in=plaintext.txt -out=crypttext.txt.aes
  - decrypt a file:
-	crypt -d -in=crypttext.txt.aes -out=plaintext.txt -key=this_is_a_secret
- note: spaces must be escaped
+	CRYPTOD_KEY=this_is_a_secret crypt -d -in=crypttext.txt.aes -out=plaintext.txt
+
+ The encryption key must be provided via the CRYPTOD_KEY environment variable.
+ WARNING: Never pass keys as command-line arguments - they will be visible in
+ process lists and shell history!
 `
 
 var (
@@ -23,7 +26,6 @@ var (
 	modeDecrypt    bool
 	fileIn         string
 	fileOut        string
-	skey           string
 	forceOverwrite bool
 )
 
@@ -32,7 +34,6 @@ func init() {
 	flag.BoolVar(&modeDecrypt, "d", false, "decryption mode")
 	flag.StringVar(&fileIn, "in", "", "input file")
 	flag.StringVar(&fileOut, "out", "", "output file")
-	flag.StringVar(&skey, "key", "", "secret key")
 	flag.BoolVar(&forceOverwrite, "f", false, "force overwrite of output file")
 }
 
@@ -55,9 +56,10 @@ func main() {
 		flag.Usage()
 	}
 
-	// need a key
+	// get key from environment variable
+	skey := os.Getenv("CRYPTOD_KEY")
 	if skey == "" {
-		printError("missing secret key")
+		printError("missing secret key - set CRYPTOD_KEY environment variable")
 		flag.Usage()
 	}
 
@@ -80,7 +82,7 @@ func main() {
 }
 
 func help() {
-	fmt.Fprintln(os.Stderr, usageMessage)
+	fmt.Fprint(os.Stderr, usageMessage)
 	fmt.Fprintln(os.Stderr, "Flags:")
 	flag.PrintDefaults()
 	os.Exit(2)

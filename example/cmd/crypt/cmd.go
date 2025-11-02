@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/wiggin77/cryptod"
@@ -13,7 +14,11 @@ func cmd(encrypt bool, fileIn string, fileOut string, skey string) error {
 	if err != nil {
 		return err
 	}
-	defer r.Close()
+	defer func() {
+		if closeErr := r.Close(); closeErr != nil {
+			fmt.Fprintf(os.Stderr, "warning: error closing input file: %v\n", closeErr)
+		}
+	}()
 
 	// get the mode so it can be applied to the output file.
 	fi, err := r.Stat()
@@ -27,7 +32,11 @@ func cmd(encrypt bool, fileIn string, fileOut string, skey string) error {
 	if err != nil {
 		return err
 	}
-	defer w.Close()
+	defer func() {
+		if closeErr := w.Close(); closeErr != nil {
+			fmt.Fprintf(os.Stderr, "warning: error closing output file: %v\n", closeErr)
+		}
+	}()
 
 	// copy fileIn mode to output file
 	if err := w.Chmod(fmode); err != nil {
@@ -41,8 +50,12 @@ func cmd(encrypt bool, fileIn string, fileOut string, skey string) error {
 	}
 
 	if err != nil {
-		w.Close()
-		os.Remove(fileOut)
+		if closeErr := w.Close(); closeErr != nil {
+			fmt.Fprintf(os.Stderr, "warning: error closing output file during cleanup: %v\n", closeErr)
+		}
+		if removeErr := os.Remove(fileOut); removeErr != nil {
+			fmt.Fprintf(os.Stderr, "warning: error removing output file during cleanup: %v\n", removeErr)
+		}
 	}
 	return err
 }

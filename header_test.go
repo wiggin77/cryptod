@@ -54,3 +54,26 @@ func TestHeaderReadGibberish(t *testing.T) {
 		t.Error("expected error")
 	}
 }
+
+// errorWriter is a test writer that always returns an error
+type errorWriter struct{}
+
+func (e *errorWriter) Write(p []byte) (n int, err error) {
+	return 0, io.ErrShortWrite
+}
+
+// TestHeaderWriteError tests that write errors are properly propagated
+// This test demonstrates bug in header.go:71 where errors are returned as nil
+func TestHeaderWriteError(t *testing.T) {
+	h := header{}
+	h.init()
+
+	ew := &errorWriter{}
+	err := h.write(ew)
+
+	// BUG: Currently this returns nil instead of the write error
+	// After fix, this test should pass
+	if err == nil {
+		t.Error("BUG: expected write error to be returned, got nil (bug in header.go:71)")
+	}
+}
