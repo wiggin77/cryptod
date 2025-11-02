@@ -122,6 +122,103 @@ func TestTamper(t *testing.T) {
 	}
 }
 
+// TestChunkBoundaries tests encryption/decryption at exact chunk size boundaries
+func TestChunkBoundaries(t *testing.T) {
+	// Test data sizes that align exactly with chunk boundaries
+	sizes := []int{
+		chunkSize,     // Exactly 1 chunk
+		chunkSize * 2, // Exactly 2 chunks
+		chunkSize * 3, // Exactly 3 chunks
+		chunkSize - 1, // Just under 1 chunk
+		chunkSize + 1, // Just over 1 chunk
+	}
+	const key = "secret key"
+
+	for _, size := range sizes {
+		plaintext := generatePlainText(size)
+
+		r := bytes.NewReader(plaintext)
+		buf := &bytes.Buffer{}
+
+		if err := Encrypt(r, buf, key); err != nil {
+			t.Errorf("encrypt error for size %d: %v", size, err)
+			continue
+		}
+
+		pbuf := &bytes.Buffer{}
+		if err := Decrypt(buf, pbuf, key); err != nil {
+			t.Errorf("decrypt error for size %d: %v", size, err)
+			continue
+		}
+
+		if bytes.Compare(plaintext, pbuf.Bytes()) != 0 {
+			t.Errorf("compare failed for size %d, bytes differ", size)
+		}
+	}
+}
+
+// TestMultipleChunks verifies that data spanning multiple chunks is handled correctly
+func TestMultipleChunks(t *testing.T) {
+	const key = "secret key"
+	// Create data that will definitely span multiple chunks (5MB)
+	size := chunkSize * 5
+	plaintext := generatePlainText(size)
+
+	r := bytes.NewReader(plaintext)
+	buf := &bytes.Buffer{}
+
+	if err := Encrypt(r, buf, key); err != nil {
+		t.Errorf("encrypt error: %v", err)
+		return
+	}
+
+	// Verify encrypted size is larger due to overhead
+	if buf.Len() <= size {
+		t.Error("encrypted data should be larger than plaintext")
+	}
+
+	pbuf := &bytes.Buffer{}
+	if err := Decrypt(buf, pbuf, key); err != nil {
+		t.Errorf("decrypt error: %v", err)
+		return
+	}
+
+	if bytes.Compare(plaintext, pbuf.Bytes()) != 0 {
+		t.Error("decrypted data does not match original")
+	}
+
+	t.Logf("Successfully encrypted/decrypted %d bytes across ~%d chunks", size, (size/chunkSize)+1)
+}
+
+// TestEmptyFile tests encryption and decryption of an empty file
+func TestEmptyFile(t *testing.T) {
+	const key = "secret key"
+	plaintext := []byte{}
+
+	r := bytes.NewReader(plaintext)
+	buf := &bytes.Buffer{}
+
+	if err := Encrypt(r, buf, key); err != nil {
+		t.Errorf("encrypt error for empty file: %v", err)
+		return
+	}
+
+	// Empty file should still have header and tomb chunk
+	if buf.Len() == 0 {
+		t.Error("encrypted empty file should have header and tomb chunk")
+	}
+
+	pbuf := &bytes.Buffer{}
+	if err := Decrypt(buf, pbuf, key); err != nil {
+		t.Errorf("decrypt error for empty file: %v", err)
+		return
+	}
+
+	if pbuf.Len() != 0 {
+		t.Errorf("decrypted empty file should be empty, got %d bytes", pbuf.Len())
+	}
+}
+
 // helper to generate predicable plaintext of any size
 func generatePlainText(size int) []byte {
 	const s = "0123456789"

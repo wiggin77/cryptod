@@ -6,12 +6,14 @@
 //
 // To encrypt data, provide an io.Reader interface to the plaintext data and an io.Writer which
 // will receive the encrypted data:
-//  plaintext := bytes.NewReader([]byte("my secret data"))
-//  cryptbuf := bytes.Buffer{}
-//  err := Encrypt(plaintext, cryptbuf, "secret_key")
+//
+//	plaintext := bytes.NewReader([]byte("my secret data"))
+//	cryptbuf := bytes.Buffer{}
+//	err := Encrypt(plaintext, cryptbuf, "secret_key")
 //
 // To decrypt the data, provide an io.Reader interface to the encrypted data and an io.Writer which
 // will receive the plaintext:
-//  plainbuf := bytes.Buffer{}
-//  err := Decrypt(cryptbuf, plainbuf, "secret_key")
+//
+//	plainbuf := bytes.Buffer{}
+//	err := Decrypt(cryptbuf, plainbuf, "secret_key")
 package cryptod

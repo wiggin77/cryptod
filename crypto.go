@@ -48,9 +48,12 @@ func Encrypt(r io.Reader, w io.Writer, skey string) error {
 				return err
 			}
 			binary.PutUvarint(nonce, uint64(ctr))
+			// create AAD with chunk counter to authenticate chunk sequence
+			aad := make([]byte, 4)
+			binary.LittleEndian.PutUint32(aad, ctr)
 			ctr++
-			// encrypt and authenticate
-			c := gcm.Seal(cbuf[:0], nonce, p, nil)
+			// encrypt and authenticate with AAD binding chunk counter
+			c := gcm.Seal(cbuf[:0], nonce, p, aad)
 			var clen = uint32(len(c))
 			if clen > 0 {
 				// write a chunk header containing actual encrypted block size
@@ -69,7 +72,9 @@ func Encrypt(r io.Reader, w io.Writer, skey string) error {
 		}
 	}
 	// write the tomb chunk header
-	io.ReadFull(rand.Reader, nonce)
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		return err
+	}
 	return writeChunkHeader(chunkHeader{nonce: nonce, size: 0, tomb: true}, w)
 }
 
@@ -86,6 +91,7 @@ func Decrypt(r io.Reader, w io.Writer, skey string) error {
 
 	// reuse buffers to reduce GC
 	buf := make([]byte, maxChunkSize)
+	var ctr uint32 = 1 // track expected chunk counter
 
 	// read and validate the header
 	h := header{}
@@ -116,9 +122,12 @@ func Decrypt(r io.Reader, w io.Writer, skey string) error {
 		if n != int(ch.size) {
 			return fmt.Errorf("wrong chunk size read, expected %d, got %d", ch.size, n)
 		}
-		// decrypt the chunk
+		// decrypt the chunk with AAD verification
+		aad := make([]byte, 4)
+		binary.LittleEndian.PutUint32(aad, ctr)
+		ctr++
 		var pbuf []byte
-		if pbuf, err = gcm.Open(cbuf[:0], ch.nonce, cbuf, nil); err != nil {
+		if pbuf, err = gcm.Open(cbuf[:0], ch.nonce, cbuf, aad); err != nil {
 			return err
 		}
 		// write plaintext to w

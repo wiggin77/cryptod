@@ -1,4 +1,5 @@
 // Package main_test provides a simple test of the cryptod sample app.
+//go:build linux
 // +build linux
 
 package main_test

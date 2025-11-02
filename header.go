@@ -68,7 +68,7 @@ func (h *header) write(w io.Writer) error {
 	fields := [][]byte{h.size[:], h.magic[:], h.scheme[:], h.verMaj[:], h.verMin[:]}
 	for _, f := range fields {
 		if _, err = w.Write(f); err != nil {
-			return nil
+			return err
 		}
 	}
 	return nil

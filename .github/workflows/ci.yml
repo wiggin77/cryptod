@@ -1,0 +1,143 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+      - main
+  pull_request:
+    branches:
+      - master
+      - main
+
+jobs:
+  test:
+    name: Test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        go: ['1.21', '1.22', '1.23']
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go }}
+
+      - name: Display Go version
+        run: go version
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Run tests
+        run: make test
+
+      - name: Run tests with race detector
+        run: make test-race
+
+  security-tests:
+    name: Security Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Run security tests
+        run: make test-security
+
+  code-quality:
+    name: Code Quality
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Check formatting
+        run: make check-fmt
+
+      - name: Run go vet
+        run: make vet
+
+      - name: Run linter
+        run: make lint
+
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Generate coverage report
+        run: make test-cover
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.out
+          flags: unittests
+          fail_ci_if_error: false
+
+  build-cli:
+    name: Build CLI
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Build CLI
+        run: make build-cli
+
+      - name: Test CLI binary (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          echo "test data" > /tmp/test.txt
+          CRYPTOD_KEY="test_key" ./example/cmd/crypt/crypt -e -in=/tmp/test.txt -out=/tmp/test.aes
+          CRYPTOD_KEY="test_key" ./example/cmd/crypt/crypt -d -in=/tmp/test.aes -out=/tmp/test_decrypt.txt
+          diff /tmp/test.txt /tmp/test_decrypt.txt
+
+      - name: Test CLI binary (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          "test data" | Out-File -FilePath test.txt
+          $env:CRYPTOD_KEY="test_key"
+          .\example\cmd\crypt\crypt.exe -e -in=test.txt -out=test.aes
+          .\example\cmd\crypt\crypt.exe -d -in=test.aes -out=test_decrypt.txt
+          if (Compare-Object (Get-Content test.txt) (Get-Content test_decrypt.txt)) {
+            exit 1
+          }
