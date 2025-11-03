@@ -13,4 +13,6 @@
 
 # VSCode
 .vscode
+coverage.html
+coverage.out
 
