@@ -9,11 +9,17 @@ A Go library for **AES-256-GCM authenticated encryption** of arbitrarily large d
 ## Features
 
 ✅ **Memory Efficient** - Processes data in 1MB chunks, handles files of any size
+
 ✅ **Authenticated Encryption** - AES-256-GCM with chunk sequence integrity protection
+
 ✅ **Secure by Design** - Protection against chunk reordering, deletion, and duplication attacks
+
 ✅ **Streaming API** - Works with any `io.Reader` and `io.Writer`
+
 ✅ **Simple API** - Two functions: `Encrypt()` and `Decrypt()`
+
 ✅ **Well Tested** - Comprehensive unit tests and security tests
+
 ✅ **Production Ready** - Battle-tested cryptographic primitives from Go's standard library
 
 ## Installation
