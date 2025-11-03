@@ -63,7 +63,7 @@ func main() {
 		flag.Usage()
 	}
 
-	// output file can be infered
+	// output file can be inferred
 	if fileOut == "" {
 		fileOut = inferOutputFile(modeEncrypt, fileIn)
 	}
